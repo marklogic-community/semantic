@@ -26,14 +26,23 @@ let $skip-existing := true()
 let $map := map:map()
 let $build := (
   for $xml in xdmp:get-request-field('xml')
-  let $n as element(quad) := xdmp:unquote($xml)/quad
+  let $n as element(t) := xdmp:unquote($xml)/t
   let $key := string(
     xdmp:hash64(
       string-join(
         (: I want these elements to be in order, for deterministic uris :)
-        ($n/subject, $n/predicate, $n/object, $n/context), '|')))
+        ($n/s, $n/p, $n/o, $n/c), '|')))
   where empty(map:get($map, $key))
-  return map:put($map, $key, $n)
+  return map:put(
+    $map, $key, element t {
+      $n/@*,
+      for $n in $n/node()
+      return typeswitch($n)
+      case element() return element { node-name($n) } {
+        attribute h { xdmp:hash64($n) },
+        $n/node() }
+      default return $n
+      } )
 )
 let $keys := map:keys($map)
 let $forests := xdmp:database-forests(xdmp:database())

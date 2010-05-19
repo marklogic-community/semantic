@@ -35,6 +35,7 @@ import java.net.URI;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.util.Arrays;
+import java.util.Random;
 import java.util.regex.Pattern;
 
 import org.semanticweb.yars.nx.Node;
@@ -48,26 +49,11 @@ import com.marklogic.recordloader.FatalException;
 import com.marklogic.recordloader.LoaderException;
 
 /**
- * Copyright (c) 2009 Mark Logic Corporation. All rights reserved.
- */
-
-/**
  * @author Michael Blakeley, Mark Logic Corporation
- *
+ * 
  */
 public class NQuadLoader extends AbstractLoader {
 
-    /*
-     * An EBNF grammar for N-Quads documents can be derived from the N-Triples
-     * grammar by replacing the triple production with a new contextTriple
-     * production
-     */
-    // contextTriple ::= subject predicate object context?
-    // context ::= uriref | nodeID | literal
-
-    /**
-     *
-     */
     private static final int OBJECT = 2;
 
     private boolean detectDecimal = false;
@@ -80,16 +66,23 @@ public class NQuadLoader extends AbstractLoader {
 
     private long count = 0;
 
+    private Random random = new Random();
+
+    private URI[] connectionStrings;
+
     public void process() throws LoaderException {
         super.process();
 
-        // TODO: should come from config
-        int batchSize = 10;
+        // HACK marriage of convenience - ID_NAME must be set
+        // but isn't otherwise used.
+        int batchSize = Integer.parseInt(config.getIdNodeName());
         String[] tuples = new String[batchSize];
         int tupleCount = 0;
 
+        connectionStrings = config.getConnectionStrings();
         decimalPattern = Pattern.compile("^\\d*\\.?\\d+$");
         NxParser nxp;
+
         try {
             nxp = new NxParser(input, false);
             TimedEvent te = null;
@@ -123,7 +116,7 @@ public class NQuadLoader extends AbstractLoader {
 
             // insert any pending tuples
             if (tupleCount > 0) {
-                logger.info("cleaning up " + tupleCount);
+                logger.fine("cleaning up " + tupleCount);
                 tuples = Arrays.copyOf(tuples, tupleCount);
                 count += tupleCount;
                 // no try-catch, because we're done anyhow
@@ -152,7 +145,7 @@ public class NQuadLoader extends AbstractLoader {
             isDecimal = decimalPattern.matcher(value).matches();
         }
 
-        StringBuilder xml = new StringBuilder("<q>");
+        StringBuilder xml = new StringBuilder("<t>");
         for (int i = 0; i < ns.length; i++) {
             n = ns[i];
             name = names[i];
@@ -171,7 +164,7 @@ public class NQuadLoader extends AbstractLoader {
                     .append(new BigDecimal(value).toPlainString())
                     .append("</dec>");
         }
-        xml.append("</q>\n");
+        xml.append("</t>\n");
 
         return xml.toString();
     }
@@ -294,8 +287,6 @@ public class NQuadLoader extends AbstractLoader {
         }
         // TODO: move into Content subclass with body bytes?
         _event.increment(body.length());
-        // if multiple connString are available, we round-robin
-        URI[] connectionStrings = config.getConnectionStrings();
         // retry loop
         int tries = 0;
         int maxTries = 10;
@@ -304,11 +295,10 @@ public class NQuadLoader extends AbstractLoader {
         while (tries < maxTries) {
             // retry will get a different server, if available
             // count will generally be an even multiple of batchSize, so...
-            int x = (int) (((tries + count) / connectionStrings.length)
-                           % connectionStrings.length);
             try {
-                doRequest(connectionStrings[x].toString(), body
-                        .toString());
+                doRequest(connectionStrings[random
+                        .nextInt(connectionStrings.length)].toString(),
+                        body.toString());
                 break;
             } catch (LoaderException e) {
                 if (tries < maxTries
