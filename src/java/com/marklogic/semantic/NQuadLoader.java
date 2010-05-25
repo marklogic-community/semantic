@@ -35,7 +35,10 @@ import java.net.URI;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Random;
+import java.util.Map.Entry;
 import java.util.regex.Pattern;
 
 import org.semanticweb.yars.nx.Node;
@@ -44,7 +47,6 @@ import org.semanticweb.yars.nx.parser.NxParser;
 import com.marklogic.ps.Utilities;
 import com.marklogic.ps.timing.TimedEvent;
 import com.marklogic.recordloader.AbstractLoader;
-import com.marklogic.recordloader.Configuration;
 import com.marklogic.recordloader.FatalException;
 import com.marklogic.recordloader.LoaderException;
 
@@ -54,7 +56,13 @@ import com.marklogic.recordloader.LoaderException;
  */
 public class NQuadLoader extends AbstractLoader {
 
+    protected Configuration config = (Configuration) super.config;
+
+    private static final Long LONG_ONE = new Long(1);
+
     private static final int OBJECT = 2;
+
+    private static final String VERSION = "2010-05-25.4";
 
     private boolean detectDecimal = false;
 
@@ -66,18 +74,115 @@ public class NQuadLoader extends AbstractLoader {
 
     private long count = 0;
 
-    private Random random = new Random();
+    private static Random random = new Random();
 
     private URI[] connectionStrings;
+
+    class DuplicateFilter {
+
+        private int limit = config.getDuplicateFilterLimit();
+
+        private Object mutex = new Object();
+
+        Map<String, Long> m = null;
+
+        /**
+         * @param duplicateFilterLimit
+         */
+        public DuplicateFilter(int duplicateFilterLimit) {
+            m = new LinkedHashMap<String, Long>(limit, 0.75f, true) {
+                private static final long serialVersionUID = 1L;
+
+                @Override
+                protected boolean removeEldestEntry(
+                        Entry<String, Long> eldest) {
+                    if (size() <= limit) {
+                        return false;
+                    }
+                    Entry<String, Long> e = eldest;
+                    String k;
+                    int tries = 10;
+                    while (size() > limit) {
+                        k = e.getKey();
+                        if (e.getValue() < 2) {
+                            m.remove(k);
+                        } else {
+                            // tickle it so it won't be eldest anymore
+                            m.get(k);
+                        }
+                        tries--;
+                        if (tries < 0) {
+                            logger.warning("size = " + size()
+                                    + ", limit = " + limit);
+                            break;
+                        }
+                        // get the iterator fresh every time,
+                        // because this loop will surely modify it
+                        e = m.entrySet().iterator().next();
+                    }
+                    return false;
+                }
+            };
+        }
+
+        protected boolean exists(String key) {
+            synchronized (mutex) {
+                if (m.containsKey(key)) {
+                    m.put(key, m.get(key) + 1);
+                    return true;
+                }
+                m.put(key, LONG_ONE);
+                return false;
+            }
+        }
+
+        /**
+         * @return
+         */
+        public int size() {
+            synchronized (mutex) {
+                return m.size();
+            }
+        }
+
+        /**
+         * @return the limit
+         */
+        public int getLimit() {
+            synchronized (mutex) {
+                return limit;
+            }
+        }
+
+    }
+
+    static private DuplicateFilter duplicateFilter = null;
+
+    static private Object initMutex = new Object();
 
     public void process() throws LoaderException {
         super.process();
 
-        // HACK marriage of convenience - ID_NAME must be set
-        // but isn't otherwise used.
-        int batchSize = Integer.parseInt(config.getIdNodeName());
+        // race to initialize
+        if (null == duplicateFilter) {
+            synchronized (initMutex) {
+                // maybe someone else already got it?
+                if (null == duplicateFilter) {
+                    logger.info("initializing version " + VERSION);
+                    duplicateFilter = new DuplicateFilter(config
+                            .getDuplicateFilterLimit());
+                    logger.info("filter size limit "
+                            + duplicateFilter.getLimit());
+                    // informational message, on initialization only
+                    logger.info("batch size " + config.getBatchSize());
+                }
+            }
+        }
+
+        int batchSize = config.getBatchSize();
         String[] tuples = new String[batchSize];
-        int tupleCount = 0;
+        int batchCount = 0;
+        long duplicateCount = 0;
 
         connectionStrings = config.getConnectionStrings();
         decimalPattern = Pattern.compile("^\\d*\\.?\\d+$");
@@ -86,15 +191,24 @@ public class NQuadLoader extends AbstractLoader {
         try {
             nxp = new NxParser(input, false);
             TimedEvent te = null;
+            String nextTuple = null;
             while (nxp.hasNext()) {
                 te = new TimedEvent();
-                tuples[tupleCount] = processNext(nxp.next());
-                tupleCount++;
-                if (tupleCount >= tuples.length) {
+                nextTuple = processNext(nxp.next());
+                if (duplicateFilter.exists(nextTuple)) {
+                    // this tuple is a duplicate - skip it
+                    duplicateCount++;
+                    logger.finer("skipping duplicate tuple "
+                            + duplicateCount + ": " + nextTuple);
+                    continue;
+                }
+                tuples[batchCount] = nextTuple;
+                batchCount++;
+                if (batchCount >= tuples.length) {
                     logger.fine("batch complete");
                     // send these tuples to the database
                     try {
-                        count += tupleCount;
+                        count += batchCount;
                         insert(tuples, te);
                     } catch (UnsupportedEncodingException e) {
                         if (config.isFatalErrors()) {
@@ -109,16 +223,16 @@ public class NQuadLoader extends AbstractLoader {
                     }
 
                     // and create a new array
-                    tupleCount = 0;
+                    batchCount = 0;
                     tuples = new String[tuples.length];
                 }
             }
 
             // insert any pending tuples
-            if (tupleCount > 0) {
-                logger.fine("cleaning up " + tupleCount);
-                tuples = Arrays.copyOf(tuples, tupleCount);
-                count += tupleCount;
+            if (batchCount > 0) {
+                logger.fine("cleaning up " + batchCount);
+                tuples = Arrays.copyOf(tuples, batchCount);
+                count += batchCount;
                 // no try-catch, because we're done anyhow
                 insert(tuples, (null == te ? new TimedEvent() : te));
             }
@@ -164,7 +278,7 @@ public class NQuadLoader extends AbstractLoader {
                     .append(new BigDecimal(value).toPlainString())
                     .append("</dec>");
         }
-        xml.append("</t>\n");
+        xml.append("</t>");
 
         return xml.toString();
     }
@@ -292,13 +406,16 @@ public class NQuadLoader extends AbstractLoader {
         int maxTries = 10;
         long sleepMillis = Configuration.SLEEP_TIME;
         String label = Thread.currentThread().getName() + "=" + count;
+        URI url = null;
         while (tries < maxTries) {
             // retry will get a different server, if available
             // count will generally be an even multiple of batchSize, so...
+            synchronized (random) {
+                url = connectionStrings[random
+                        .nextInt(connectionStrings.length)];
+            }
             try {
-                doRequest(connectionStrings[random
-                        .nextInt(connectionStrings.length)].toString(),
-                        body.toString());
+                doRequest(url.toString(), body.toString());
                 break;
             } catch (LoaderException e) {
                 if (tries < maxTries
@@ -323,6 +440,15 @@ public class NQuadLoader extends AbstractLoader {
             }
         }
         monitor.add(label, _event);
-        Thread.yield();
+        // Thread.yield();
     }
+
+    @Override
+    public void setConfiguration(
+            com.marklogic.recordloader.Configuration _config)
+            throws LoaderException {
+        super.setConfiguration(_config);
+        config = (Configuration) _config;
+    }
+
 }
