@@ -34,10 +34,9 @@ import java.net.ProtocolException;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLEncoder;
-import java.util.Arrays;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Random;
 import java.util.Map.Entry;
 import java.util.regex.Pattern;
 
@@ -62,7 +61,7 @@ public class NQuadLoader extends AbstractLoader {
 
     private static final int OBJECT = 2;
 
-    private static final String VERSION = "2010-05-25.4";
+    private static final String VERSION = "2010-05-25.5";
 
     private boolean detectDecimal = false;
 
@@ -74,9 +73,7 @@ public class NQuadLoader extends AbstractLoader {
 
     private long count = 0;
 
-    private static Random random = new Random();
-
-    private URI[] connectionStrings;
+    static private Object initMutex = new Object();
 
     class DuplicateFilter {
 
@@ -158,7 +155,86 @@ public class NQuadLoader extends AbstractLoader {
 
     static private DuplicateFilter duplicateFilter = null;
 
-    static private Object initMutex = new Object();
+    class BatchGroup {
+
+        int size;
+
+        int[] current;
+
+        URI[] uris;
+
+        Map<URI, String[]> tupleMap = new HashMap<URI, String[]>();
+
+        /**
+         * @param _size
+         * @param _uris
+         */
+        public BatchGroup(int _size, URI[] _uris) {
+            size = _size;
+            uris = _uris;
+            current = new int[uris.length];
+            //logger.info("buckets " + uris.length);
+            for (int i = 0; i < uris.length; i++) {
+                tupleMap.put(uris[i], new String[size]);
+                current[i] = 0;
+            }
+        }
+
+        /**
+         * @param _tuple
+         * @return
+         */
+        public int put(String _tuple) {
+            int bucket = Math.abs(_tuple.hashCode() % uris.length);
+            String[] tuples = tupleMap.get(uris[bucket]);
+            tuples[current[bucket]] = _tuple;
+            current[bucket]++;
+            if (current[bucket] < size) {
+                return -1;
+            }
+            //logger.info("batch complete for bucket " + bucket);
+            return bucket;
+        }
+
+        /**
+         * @param _bucket
+         * @return
+         */
+        public String[] tuples(int _bucket) {
+            return tupleMap.get(uris[_bucket]);
+        }
+
+        /**
+         * @param _bucket
+         */
+        public void reset(int _bucket) {
+            current[_bucket] = 0;
+        }
+
+        /**
+         * @param _bucket
+         * @return
+         */
+        public URI uri(int _bucket) {
+            return uris[_bucket];
+        }
+
+        /**
+         * @param _bucket
+         * @return
+         */
+        public int size(int _bucket) {
+            return current[_bucket];
+        }
+
+        /**
+         * @return
+         */
+        public int length() {
+            return uris.length;
+        }
+
+    }
 
     public void process() throws LoaderException {
         super.process();
@@ -179,19 +255,19 @@ public class NQuadLoader extends AbstractLoader {
             }
         }
 
-        int batchSize = config.getBatchSize();
-        String[] tuples = new String[batchSize];
-        int batchCount = 0;
+        BatchGroup bg = new BatchGroup(config.getBatchSize(), config
+                .getConnectionStrings());
+        decimalPattern = Pattern.compile("^\\d*\\.?\\d+$");
+        TimedEvent te = null;
         long duplicateCount = 0;
 
-        connectionStrings = config.getConnectionStrings();
-        decimalPattern = Pattern.compile("^\\d*\\.?\\d+$");
         NxParser nxp;
+        String nextTuple;
+        int bucket;
+        int size;
 
         try {
             nxp = new NxParser(input, false);
-            TimedEvent te = null;
-            String nextTuple = null;
             while (nxp.hasNext()) {
                 te = new TimedEvent();
                 nextTuple = processNext(nxp.next());
@@ -202,41 +278,52 @@ public class NQuadLoader extends AbstractLoader {
                             + duplicateCount + ": " + nextTuple);
                     continue;
                 }
-                tuples[batchCount] = nextTuple;
-                batchCount++;
-                if (batchCount >= tuples.length) {
-                    logger.fine("batch complete");
-                    // send these tuples to the database
-                    try {
-                        count += batchCount;
-                        insert(tuples, te);
-                    } catch (UnsupportedEncodingException e) {
-                        if (config.isFatalErrors()) {
-                            throw e;
-                        }
-                        logger.logException("non-fatal", e);
-                    } catch (LoaderException e) {
-                        if (config.isFatalErrors()) {
-                            throw e;
-                        }
-                        logger.logException("non-fatal", e);
-                    }
 
-                    // and create a new array
-                    batchCount = 0;
-                    tuples = new String[tuples.length];
+                bucket = bg.put(nextTuple);
+                if (0 > bucket) {
+                    continue;
                 }
+
+                // send these tuples to the database
+                try {
+                    size = bg.size(bucket);
+                    insert(bg.tuples(bucket), te, bg.uri(bucket), size);
+                    count += size;
+                } catch (UnsupportedEncodingException e) {
+                    if (config.isFatalErrors()) {
+                        throw e;
+                    }
+                    logger.logException("non-fatal", e);
+                } catch (LoaderException e) {
+                    if (config.isFatalErrors()) {
+                        throw e;
+                    }
+                    logger.logException("non-fatal", e);
+                }
+
+                // reset the bucket
+                bg.reset(bucket);
+            }
+
+            if (null == te) {
+                // we never started
+                return;
             }
 
             // insert any pending tuples
-            if (batchCount > 0) {
-                logger.fine("cleaning up " + batchCount);
-                tuples = Arrays.copyOf(tuples, batchCount);
-                count += batchCount;
-                // no try-catch, because we're done anyhow
-                insert(tuples, (null == te ? new TimedEvent() : te));
+            int length = bg.length();
+            for (int i = 0; i < length; i++) {
+                size = bg.size(i);
+                if (size < 1) {
+                    continue;
+                }
+                //logger.info("cleaning up " + size + " for bucket " + i);
+                // no need to try-catch and check isFatalErrors()
+                // because we are done either way.
+                insert(bg.tuples(i), te, bg.uri(i), size);
+                count += size;
+                // no need to reset the bucket
             }
-
         } catch (IOException e) {
             throw new LoaderException(e);
         }
@@ -386,16 +473,12 @@ public class NQuadLoader extends AbstractLoader {
         authenticatorIsIntialized = true;
     }
 
-    /**
-     * @param tuples
-     * @param _event
-     * @throws LoaderException
-     * @throws UnsupportedEncodingException
-     */
-    private void insert(String[] tuples, TimedEvent _event)
-            throws LoaderException, UnsupportedEncodingException {
+    private void insert(String[] tuples, TimedEvent _event, URI _url,
+            int _size) throws LoaderException,
+            UnsupportedEncodingException {
+        String label = Thread.currentThread().getName() + "=" + count;
         StringBuilder body = new StringBuilder();
-        for (int i = 0; i < tuples.length; i++) {
+        for (int i = 0; i < _size; i++) {
             body.append((0 == i) ? "" : "&").append("xml=").append(
                     URLEncoder.encode(tuples[i], "UTF-8"));
         }
@@ -405,17 +488,10 @@ public class NQuadLoader extends AbstractLoader {
         int tries = 0;
         int maxTries = 10;
         long sleepMillis = Configuration.SLEEP_TIME;
-        String label = Thread.currentThread().getName() + "=" + count;
-        URI url = null;
         while (tries < maxTries) {
-            // retry will get a different server, if available
-            // count will generally be an even multiple of batchSize, so...
-            synchronized (random) {
-                url = connectionStrings[random
-                        .nextInt(connectionStrings.length)];
-            }
             try {
-                doRequest(url.toString(), body.toString());
+                doRequest(_url.toString(), body.toString());
+                monitor.add(label, _event);
                 break;
             } catch (LoaderException e) {
                 if (tries < maxTries
@@ -439,8 +515,6 @@ public class NQuadLoader extends AbstractLoader {
                 throw e;
             }
         }
-        monitor.add(label, _event);
-        // Thread.yield();
     }
 
     @Override

@@ -22,42 +22,78 @@ xquery version "1.0-ml";
  : @author Michael Blakeley, Mark Logic Corporation
  :)
 
-let $skip-existing := true()
-let $map := map:map()
-let $build := (
-  for $xml in xdmp:get-request-field('xml')
-  let $n as element(t) := xdmp:unquote($xml)/t
-  let $key := string(
-    xdmp:hash64(
-      string-join(
-        (: I want these elements to be in order, for deterministic uris :)
-        ($n/s, $n/p, $n/o, $n/c), '|')))
-  where empty(map:get($map, $key))
-  return map:put(
-    $map, $key, element t {
-      $n/@*,
-      for $n in $n/node()
-      return typeswitch($n)
-      case element() return element { node-name($n) } {
-        attribute h { xdmp:hash64($n) },
-        $n/node() }
-      default return $n
-      } )
-)
-let $keys := map:keys($map)
-let $forests := xdmp:database-forests(xdmp:database())
-let $index := 1 + xs:unsignedLong($keys[1]) mod count($forests)
-let $forest := subsequence($forests, $index, 1)
-for $key in $keys
-let $uri := xdmp:integer-to-hex(xs:unsignedLong($key))
-where not($skip-existing) or empty(doc($uri))
-return xdmp:document-insert(
-  $uri,
-  map:get($map, $key),
-  xdmp:default-permissions(),
-  xdmp:default-collections(),
-  0,
-  $forest
+declare namespace hs="http://marklogic.com/xdmp/status/host"
+;
+
+import module namespace sem="http://marklogic.com/semantic"
+ at "semantic.xqy";
+
+declare variable $FORESTS as xs:unsignedLong+ := (
+  (: use local forests only :)
+  let $forest-key := 'http://marklogic.com/semantic/forests'
+  let $cached-forests as xs:unsignedLong* := xdmp:get-server-field($forest-key)
+  return (
+    if (exists($cached-forests)) then $cached-forests
+    else (
+      xdmp:log(text { 'determining local forests' }),
+      let $db-forests as xs:unsignedLong+ := xdmp:database-forests(
+        xdmp:database())
+      let $host-forests as xs:unsignedLong+ := xdmp:host-status(
+        xdmp:host())/hs:assignments/hs:assignment/hs:forest-id
+      return xdmp:set-server-field(
+        $forest-key, $db-forests[ . = $host-forests ])
+    )
+  )
+);
+
+declare variable $FOREST-COUNT := count($FORESTS)
+;
+
+declare variable $MAP as map:map := (
+  let $m := map:map()
+  let $build := (
+    for $n in xdmp:unquote(
+      xdmp:get-request-field('xml') )/t
+    let $key := sem:uri-for-tuple($n/s, $n/p, $n/o, $n/c)
+    where empty(map:get($m, $key))
+    return map:put(
+      $m, $key, sem:tuple($n/s, $n/p, $n/o, $n/c) )
+  )
+  return $m
+);
+
+declare function local:forest(
+  $uri-key as xs:unsignedLong )
+as xs:integer
+{
+  (: mimic server builtin assignment placing :)
+  subsequence(
+    $FORESTS,
+    1 + (
+      let $v := (2047 + $FOREST-COUNT) idiv $FOREST-COUNT
+      let $u := xdmp:xor64(0, xdmp:and64(xdmp:lshift64($uri-key, 2), 2047))
+      let $u := xdmp:xor64($u, xdmp:and64(xdmp:rshift64($uri-key, 9), 2047))
+      let $u := xdmp:xor64($u, xdmp:and64(xdmp:rshift64($uri-key, 20), 2047))
+      let $u := xdmp:xor64($u, xdmp:and64(xdmp:rshift64($uri-key, 31), 2047))
+      let $u := xdmp:xor64($u, xdmp:and64(xdmp:rshift64($uri-key, 42), 2047))
+      let $u := xdmp:xor64($u, xdmp:and64(xdmp:rshift64($uri-key, 53), 2047))
+      return $u idiv $v
+    ),
+    1
+  )
+};
+
+(: NB - in-forest eval per tuple :)
+for $key in map:keys($MAP)
+return xdmp:invoke(
+  'insert-tuple.xqy',
+  (xs:QName('URI'), $key,
+    xs:QName('NODE'), map:get($MAP, $key),
+    xs:QName('SKIP-EXISTING'), false() ),
+    <options xmlns="xdmp:eval">{
+    element database {
+      local:forest(xdmp:hex-to-integer($key)) }
+    }</options>
 )
 
 (: semantic insert.xqy :)

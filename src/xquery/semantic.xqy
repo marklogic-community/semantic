@@ -31,6 +31,12 @@ declare default collation 'http://marklogic.com/collation/codepoint';
 declare variable $sem:DEBUG := false()
 ;
 
+declare variable $sem:LEXICON-OPTIONS := (
+  (: this is where we switch between docs and naked properties :)
+  if (1) then ()
+  else 'properties'
+);
+
 declare variable $sem:QN-S := xs:QName('s')
 ;
 
@@ -100,38 +106,44 @@ declare private function sem:ev(
   $qn as xs:QName+, $query as cts:query)
 as xs:string*
 {
-  cts:element-values($qn, (), (), $query)
+  cts:element-values(
+    $qn, (), $sem:LEXICON-OPTIONS, $query)
 };
 
 declare private function sem:hv(
   $qn as xs:QName+, $query as cts:query)
 as xs:unsignedLong*
 {
-  cts:element-attribute-values($qn, $QN-H, (), (), $query)
+  cts:element-attribute-values(
+    $qn, $QN-H, (), $sem:LEXICON-OPTIONS, $query)
+};
+
+declare private function sem:pq(
+  $p as xs:string+)
+ as cts:query
+{
+  sem:hq($sem:QN-P, xdmp:hash64($p))
 };
 
 declare private function sem:opq(
   $o as xs:string+, $p as xs:string+)
  as cts:query
 {
-  cts:and-query((sem:rq($sem:QN-O, $o), sem:hq($sem:QN-P, xdmp:hash64($p))))
+  cts:and-query((sem:rq($sem:QN-O, $o), sem:pq($p)))
 };
 
 declare private function sem:spq(
   $s as xs:string+, $p as xs:string+)
  as cts:query
 {
-  cts:and-query((sem:rq($sem:QN-S, $s), sem:hq($sem:QN-P, xdmp:hash64($p))))
+  cts:and-query((sem:rq($sem:QN-S, $s), sem:pq($p)))
 };
 
 declare private function sem:sopq(
   $s as xs:string+, $o as xs:string+, $p as xs:string+)
  as cts:query
 {
-  cts:and-query(
-    (sem:rq($sem:QN-S, $s),
-      sem:rq($sem:QN-O, $o),
-      sem:hq($sem:QN-P, xdmp:hash64($p))) )
+  cts:and-query((sem:rq($sem:QN-S, $s), sem:rq($sem:QN-O, $o), sem:pq($p)))
 };
 
 declare function sem:object-for-predicate(
@@ -139,7 +151,7 @@ declare function sem:object-for-predicate(
 as xs:string*
 {
   if (empty($p)) then ()
-  else sem:ev($sem:QN-O, sem:hq($sem:QN-P, xdmp:hash64($p)))
+  else sem:ev($sem:QN-O, sem:pq($p))
 };
 
 declare function sem:object-for-subject-predicate(
@@ -485,6 +497,76 @@ as element(sem:join)
 };
 
 (: substitute function calls for flwor, to maintain streaming :)
+declare function sem:object-for-join(
+  $joins as element(sem:join)+)
+ as xs:string*
+{
+  if (not($sem:DEBUG)) then ()
+  else xdmp:log(text { 'sem:object-for-join', count($joins) })
+  ,
+  if (count($joins, 2) gt 1) then sem:object-for-join(
+    sem:object-for-join($joins[1]),
+    subsequence($joins, 2) )
+  (: single join :)
+  else if ($joins/sem:o) then sem:subject-for-object-predicate(
+      $joins/sem:o, $joins/sem:p)
+  else if ($joins/sem:s) then sem:object-for-subject-predicate(
+      $joins/sem:s, $joins/sem:p)
+  (: TODO handle other join cases? :)
+  else error(
+    (), 'SEM-UNEXPECTED',
+    text { 'cannot join without object-predicate or subject-predicate' })
+};
+
+(: substitute function calls for flwor, to maintain streaming :)
+declare function sem:object-for-join(
+  $seeds as xs:string*,
+  $joins as element(sem:join)* )
+ as xs:string*
+{
+  if (not($sem:DEBUG)) then ()
+  else xdmp:log(text {
+      'sem:object-for-join', count($seeds), count($joins) })
+  ,
+  if (empty($seeds) or empty($joins)) then $seeds
+  else sem:object-for-join($seeds, $joins[1], subsequence($joins, 2))
+};
+
+
+declare function sem:object-for-join(
+  $seeds as xs:string*,
+  $first as element(sem:join),
+  $joins as element(sem:join)* )
+ as xs:string*
+{
+  sem:object-for-join(
+    $seeds, $first/sem:s, $first/sem:o, $first/sem:p, $joins)
+};
+
+declare function sem:object-for-join(
+  $seeds as xs:string*,
+  $s as xs:string*,
+  $o as xs:string*,
+  $p as xs:string*,
+  $joins as element(sem:join)* )
+ as xs:string*
+{
+  sem:object-for-join(
+    if ($o and $p) then sem:subject-by-subject-object-predicate(
+      $seeds, $o, $p)
+    (: seeds will be objects for the relation :)
+    else if ($s and $p) then sem:object-by-subject-object-predicate(
+      $s, $seeds, $p)
+    (: TODO handle other join cases? :)
+    else error(
+      (), 'SEM-UNEXPECTED',
+      text { 'cannot join without object-predicate or subject-predicate' })
+    ,
+    $joins
+  )
+};
+
+(: substitute function calls for flwor, to maintain streaming :)
 declare function sem:subject-for-join(
   $joins as element(sem:join)+)
  as xs:string*
@@ -627,14 +709,13 @@ as xs:string*
 declare function sem:relate(
   $a as xs:QName,
   $b as xs:QName,
-  $options as xs:string*,
   $a-seed as xs:string*,
   $b-seed as xs:string*,
   $join as element(sem:join)* )
 as map:map
 {
   sem:relate(
-    $a, $b, $options,
+    $a, $b,
     sem:relate-query($a, $b, $a-seed, $b-seed, $join),
     map:map()
   )
@@ -655,20 +736,20 @@ as cts:query
       return (
         if ($j/sem:o and $j/sem:p) then error((), 'UNIMPLEMENTED')
         else if ($j/sem:s and $j/sem:p) then error((), 'UNIMPLEMENTED')
-        else if ($j/sem:p) then sem:hq($sem:QN-P, xdmp:hash64($j/sem:p))
+        else if ($j/sem:p) then sem:pq($j/sem:p)
         else error((), 'SEM-UNEXPECTED')
         ) ) )
 };
 
 declare function sem:relate(
   $a as xs:QName, $b as xs:QName,
-  $options as xs:string*, $query as cts:query,
+  $query as cts:query,
   $m as map:map)
 as map:map
 {
   sem:relate(
     $m, cts:element-value-co-occurrences(
-      $a, $b, $options, $query) ),
+      $a, $b, $sem:LEXICON-OPTIONS, $query) ),
   if (not($sem:DEBUG)) then () else xdmp:log(
     text { 'sem:relate', count(map:keys($m)) } ),
   $m
@@ -683,25 +764,88 @@ as empty-sequence()
 
 declare function sem:relate-join(
   $a as xs:QName, $b as xs:QName,
-  $options as xs:string*, $query as cts:query )
+  $query as cts:query )
 as element(cts:co-occurrence)*
 {
-  cts:element-value-co-occurrences($a, $b, $options, $query)
+  cts:element-value-co-occurrences(
+    $a, $b, $sem:LEXICON-OPTIONS, $query)
 };
 
 declare function sem:relate-join(
   $a as xs:QName,
   $b as xs:QName,
-  $options as xs:string*,
   $a-seed as xs:string*,
   $b-seed as xs:string*,
   $join as element(sem:join)* )
 as element(cts:co-occurrence)*
 {
   sem:relate-join(
-    $a, $b, $options,
+    $a, $b,
     sem:relate-query($a, $b, $a-seed, $b-seed, $join)
   )
+};
+
+declare function sem:uri-for-tuple(
+  $s as xs:string,
+  $p as xs:string,
+  $o as xs:string,
+  $c as xs:string?)
+as xs:string
+{
+  (: build a deterministic uri for a triple or quad :)
+  xdmp:integer-to-hex(
+    xdmp:hash64(
+      string-join(($s, $p, $o, $c), '|') ) )
+};
+
+declare function sem:tuple(
+  $s as xs:string,
+  $p as xs:string,
+  $o as xs:string,
+  $c as xs:string?)
+as element(t)
+{
+  element t {
+    element s {
+      attribute h { xdmp:hash64($s) },
+      $s },
+    element p {
+      attribute h { xdmp:hash64($p) },
+      $p },
+    element o {
+      attribute h { xdmp:hash64($o) },
+      $o },
+    if (empty($c)) then ()
+    else element c {
+      attribute h { xdmp:hash64($c) },
+      $c }
+  }
+};
+
+declare function sem:tuple-insert(
+  $s as xs:string,
+  $p as xs:string,
+  $o as xs:string,
+  $c as xs:string?)
+as empty-sequence()
+{
+  xdmp:document-insert(
+    sem:uri-for-tuple($s, $p, $o, $c),
+    sem:tuple($s, $p, $o, $c) )
+};
+
+declare function sem:tuples-for-query(
+  $q as cts:query )
+as element(t)*
+{
+  cts:search(/t, $q, 'unfiltered')
+};
+
+declare function sem:tuples-for-predicate(
+  $p as xs:string+ )
+as element(t)*
+{
+  sem:tuples-for-query(sem:pq($p))
 };
 
 (: semantic.xqy :)
