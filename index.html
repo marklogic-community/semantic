@@ -23,10 +23,10 @@
 -->
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-<title>Semantic Storage and Retrieval</title>
+<title>Semantic Storage and Retrieval with MarkLogic Server</title>
 </head>
 <body>
-<h1>Semantic Storage and Retrieval</h1>
+<h1>Semantic Storage and Retrieval with MarkLogic Server</h1>
 
 <p>
 This project includes XQuery and Java code for storage and retrieval
@@ -35,21 +35,255 @@ The source code is available on the
 <a href="http://github.com/marklogic/semantic">project page</a>.
 </p>
 
-<h2>Storing</h2>
+<h2>Loading Semantic Data in MarkLogic Server</h2>
 <p>
 This project includes a plugin class, NQLoader,
 which used <a href="http://sw.deri.org/2006/08/nxparser/">NXParser</a>
 to extend <a href="http://github.com/marklogic/recordloader">RecordLoader</a>.
+You will need a working installation of RecordLoader,
+plus the NQLoader classes and related XQuery code.
 You can download a jar file including the NQLoader class
 <a href="semantic.jar">here</a>.
 </p>
 
-<h2>Retrieving</h2>
+<h3>Input Format</h3>
+
 <p>
-See the sample
-<a href="http://github.com/marklogic/semantic/blob/master/src/xquery/foaf.xqy">friend of a friend</a>
-query.
+NQLoader expects input data as
+<a href="http://en.wikipedia.org/wiki/N-Triples">N-Triples</a> or N-Quads.
+If you have RDF-XML, you can use the
+<a href="http://librdf.org/raptor/">Raptor</a> project's <code>rapper</code>
+tool to convert to N-Triples.
 </p>
+
+<p>
+RecordLoader can handle input from standard input, files, or zip archives.
+It is often convenient to use zip archives, since they take very little
+space on disk. With modern CPUs, RecordLoader can uncompress triples or quads
+from the zip archives very quickly.
+</p>
+
+<h3>Configuring MarkLogic Server</h3>
+
+<p>
+The semantic queries supported in this project's XQuery code
+require several range indexes.
+</p>
+
+<ul>
+<li>Element range index on <code>s</code> as string,
+  in the Unicode codepoint collation.</li>
+<li>Element range index on <code>o</code> as string,
+  in the Unicode codepoint collation.</li>
+<li>Element-attribute range index on <code>p/@h</code> as unsignedLong.</li>
+<li>Element-attribute range index on <code>c/@h</code> as unsignedLong.</li>
+</ul>
+
+<p>
+As we will see below, querying semantic information in MarkLogic Server
+does not usually rely on full-text queries. It is therefore possible
+to save both disk space and memory by disabling all full-text indexes.
+</p>
+
+<p>
+  The next section discusses ingestion via NQLoader,
+  and will also touch on application server configuration.
+</p>
+
+<h3>Running NQLoader</h3>
+<p>
+Here is a sample configuration file for RecordLoader and NQLoader.
+</p>
+
+<pre>
+CONFIGURATION_CLASSNAME=com.marklogic.semantic.Configuration
+INPUT_PATTERN=^.+\\.nt$
+THREADS=32
+CONNECTION_STRING=http://admin:admin@host-1:8012/insert.xqy http://admin:admin@host-2:8012/insert.xqy
+BATCH_SIZE=10
+</pre>
+
+<p>
+The first property, <code>CONFIGURATION_CLASSNAME</code>, tells RecordLoader
+to use the semantic plug-in for all configuration.
+This also overrides the built-in Loader class
+with the NQLoader from <code>semantic.jar</code>.
+</p>
+
+<p>
+The next three properties are generic to any use of RecordLoader:
+<code>INPUT_PATTERN</code> tells RecordLoader
+to look for <code>*.nt</code> files or zip entries:
+this is the standard extension for N-Triple and N-Quad files.
+Next, <code>THREADS</code> tells RecordLoader to start a pool
+of 32 worker threads. You may want more threads, or fewer,
+depending on your server resources.
+</p>
+
+<p>
+The next property, <code>CONNECTION_STRING</code>,
+is also a generic part of RecordLoader,
+and supports automatic load-balancing across multiple hosts.
+However, NQLoader uses <code>CONNECTION_STRING</code> somewhat differently
+than the built-in loaders do. Instead of being an XCC connection string,
+this is an HTTP service to which NQLoader will <code>POST</code>
+an XML representation of the input semantic triples or quads
+(see <a href="#DOCUMENT_FORMAT">Document Format</a>, below).
+The <code>insert.xqy</code> referred to by this connection string
+must be available to the application server,
+in this case the one running on port 8012 on host-1 and host-2.
+This code is available from github:
+<a href="http://github.com/marklogic/semantic/blob/master/src/xquery/insert.xqy">insert.xqy</a>.
+</p>
+
+<p>
+Finally, NQLoader can buffer up an arbitrary number of triples or quads
+to send to the <code>insert.xqy</code> module.
+Since each triple or quad is small,
+this buffering helps to improve ingestion performance.
+The number of triples or quads in each buffer is governed by the
+<code>BATCH_SIZE</code> property.
+NQLoader also attempts to de-duplicate tuples on the fly,
+using an LRU-like cache for recently-seen tuple data.
+NQLoader also attempts to deterministically sent the same tuples
+to the same <code>CONNECTION_STRING</code> URLs,
+as long as the property remains constant.
+</p>
+
+<p>
+Once we have assembled the necessary tools for RecordLoader and NQLoader,
+and have configured MarkLogic Server with a database and an application server,
+we can load content. Here is a sample Java command-line.
+</p>
+
+<pre>
+java -cp recordloader.jar:semantic.jar:nxparser.jar:xpp3.jar \
+  com.marklogic.ps.RecordLoader \
+  nqloader.properties \
+  *.zip
+</pre>
+
+<a id="DOCUMENT_FORMAT"/>
+<h3>Document Format</h3>
+
+<p>
+NQLoader sends each triple or quad to MarkLogic Server
+using a simplified XML representation.
+</p>
+
+<ul>
+<li>The root element is <code>t</code></li>
+<li>The subject element is <code>s</code></li>
+<li>The object element is <code>o</code></li>
+<li>The predicate element is <code>p</code></li>
+<li>If present, the context element is <code>c</code></li>
+</ul>
+
+<p>
+Here is a sample element, based on a triple from the
+<a href="http://swat.cse.lehigh.edu/projects/lubm/">LeHigh University Benchmark</a>
+(LUBM) corpus.
+</p>
+
+<pre>
+&lt;t&gt;
+  &lt;s&gt;http://www.Department17.University3.edu/UndergraduateStudent276&lt;/s&gt;
+  &lt;p&gt;http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#emailAddress&lt;/p&gt;
+  &lt;o&gt;UndergraduateStudent276@Department17.University3.edu&lt;/o&gt;
+&lt;/t&gt;
+</pre>
+
+<p>
+Note that when <code>insert.xqy</code> processes this XML,
+it will add an additional <code>@h</code> node to each leaf element.
+So the final XML will resemble this sample element.
+</p>
+
+<pre>
+&lt;t&gt;
+  &lt;s h="9003403949735004823"&gt;http://www.Department17.University3.edu/UndergraduateStudent276&lt;/s&gt;
+  &lt;p h="265699856035360262"&gt;http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#emailAddress&lt;/p&gt;
+  &lt;o h="4189577431107767985"&gt;UndergraduateStudent276@Department17.University3.edu&lt;/o&gt;
+&lt;/t&gt;
+</pre>
+
+<h2>Querying Semantic Data in MarkLogic Server</h2>
+
+<p>
+Now that we have some semantic data in the server,
+we can write simple queries that use XPath. For example:
+</p>
+
+<pre>
+/t
+  [s eq 'http://www.Department17.University3.edu/UndergraduateStudent276']
+</pre>
+
+<pre>
+/t
+  [s eq 'http://www.Department17.University3.edu/UndergraduateStudent276']
+  [p eq 'http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#emailAddress']
+  /o
+</pre>
+
+<p>
+However, these XPath queries are not very interesting
+from a semantic point of view. This is where the
+<code><a href="http://github.com/marklogic/semantic/blob/master/src/xquery/semantic.xqy">semantic.xqy</a></code>
+library becomes useful.
+</p>
+
+<h3>Transitive Closure - Friend of a Friend</h3>
+
+<p>
+One common task in semantic applications is to perform
+transitive closure over an edge type. This is especially
+useful for queries involving a "friend of a friend"
+relationship. The <code>sem:transitive-closure()</code>
+function can follow a relationship for a number of generations,
+building a map that represents the matching network.
+</p>
+
+<pre>
+xquery version "1.0-ml";
+
+import module namespace sem="http://marklogic.com/semantic"
+ at "semantic.xqy";
+
+let $m := map:map()
+let $seeds := xdmp:get-request-field('seed')
+let $filters as xs:string* := xdmp:get-request-field('filter')
+let $gen := 6
+return sem:transitive-closure(
+  $m, $seeds, $gen,
+  'http://xmlns.com/foaf/0.1/knows',
+  true(), $filters
+)
+</pre>
+
+<p>
+The semantic library also provides <code>sem:serialize()</code>
+function, which can serialize the FOAF map to a flat text format.
+</p>
+
+<h3>Joins on Subject, Object, and Predicate</h3>
+
+<p>
+Let's look at a slightly more complex problem:
+this is query 1 from the above-mentioned LUBM benchmark workload.
+It returns all subjects that match a set of joins.
+Each matching subject must be of type GraduateStudent
+and must take a specific course.
+</p>
+
+<pre>
+sem:subject-for-join(
+  (sem:object-predicate-join(
+    'http://www.Department0.University0.edu/GraduateCourse0',
+    'http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#takesCourse'),
+  sem:type-join(
+    'http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#GraduateStudent')))
+</pre>
 
 </body>
 </html>
