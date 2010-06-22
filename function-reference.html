@@ -1,0 +1,523 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+          "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <!--
+     /*
+     * Copyright (c)2009-2010 Mark Logic Corporation
+     *
+     * Licensed under the Apache License, Version 2.0 (the "License");
+     * you may not use this file except in compliance with the License.
+     * You may obtain a copy of the License at
+     *
+     * http://www.apache.org/licenses/LICENSE-2.0
+     *
+     * Unless required by applicable law or agreed to in writing, software
+     * distributed under the License is distributed on an "AS IS" BASIS,
+     * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+     * See the License for the specific language governing permissions and
+     * limitations under the License.
+     *
+     * The use of the Apache License does not indicate that this project is
+     * affiliated with the Apache Software Foundation.
+     */
+    -->
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <title>Semantic Storage and Retrieval with MarkLogic Server - Function Reference</title>
+    <link rel="stylesheet" type="text/css" href="function-reference.css" />
+  </head>
+  <body>
+    <h1>Semantic Storage and Retrieval with MarkLogic Server - Function Reference</h1>
+
+    <h1>Overview</h1>
+
+    <p>
+      See <a href="index.html">the library overview</a>
+      for more information about this project.
+    </p>
+
+    <pre>
+      xquery version "1.0-ml";
+
+      import module namespace sem="http://marklogic.com/semantic"
+      at "semantic.xqy";
+
+      1
+    </pre>
+
+    <h2>Constants</h2>
+
+    <p>The semantic library defines a number of constants,
+      some of which may be useful for queries.
+    </p>
+
+    <table summary="Constants">
+      <tr><th>Constant</th><th>Description</th></tr>
+      <tr>
+        <td class="nowrap vname">$sem:O-RDF-NIL</td>
+        <td class="description">This constant represents the RDF <code>
+            nil
+          </code>
+          object.</td>
+      </tr>
+      <tr>
+        <td class="nowrap vname">$sem:P-OWL-INTERSECTION</td>
+        <td class="description">This constant represents the OWL <code>
+            intersectionOf
+          </code>
+          predicate.</td>
+      </tr>
+      <tr>
+        <td class="nowrap vname">$sem:P-OWL-ON-PROPERTY</td>
+        <td class="description">This constant represents the OWL <code>
+            onProperty
+          </code>
+          predicate.</td>
+      </tr>
+      <tr>
+        <td class="nowrap vname">$sem:P-RDF-FIRST</td>
+        <td class="description">This constant represents the RDF <code>
+            first
+          </code>
+          predicate.</td>
+      </tr>
+      <tr>
+        <td class="nowrap vname">$sem:P-RDF-LABEL</td>
+        <td class="description">This constant represents the RDF <code>
+            label
+          </code>
+          predicate.</td>
+      </tr>
+      <tr>
+        <td class="nowrap vname">$sem:P-RDF-REST</td>
+        <td class="description">This constant represents the RDF <code>
+            rest
+          </code>
+          predicate.</td>
+      </tr>
+      <tr>
+        <td class="nowrap vname">$sem:P-RDF-SUBCLASS</td>
+        <td class="description">This constant represents the RDF <code>
+            subClassOf
+          </code>
+          predicate.</td>
+      </tr>
+      <tr>
+        <td class="nowrap vname">$sem:P-RDF-SUBPROPERTY</td>
+        <td class="description">This constant represents the RDF <code>
+            subPropertyOf
+          </code>
+          predicate.</td>
+      </tr>
+      <tr>
+        <td class="nowrap vname">$sem:P-RDF-TYPE</td>
+        <td class="description">This constant represents the RDF <code>
+            type
+          </code>
+          predicate.</td>
+      </tr>
+    </table>
+
+    <h2>Functions</h2>
+
+    <table summary="Functions">
+
+      <tr>
+        <th>Name</th>
+        <th>Parameters</th>
+        <th>Returns</th>
+        <th>Description</th>
+      </tr>
+
+      <tr>
+        <td class="nowrap fname">sem:object-for-predicate</td>
+        <td class="parameters">$p as xs:string+</td>
+        <td class="returnType">xs:string*</td>
+        <td class="description">
+          This function returns the object values of all tuples
+          that match the supplied predicate values.
+        </td>
+      </tr>
+
+      <tr>
+        <td class="nowrap fname">sem:object-for-subject-predicate</td>
+        <td class="parameters">$s as xs:string*,<br/>
+          $p as xs:string+</td>
+        <td class="returnType">xs:string*</td>
+        <td class="description">
+          This function returns the object values of all tuples
+          that match the supplied subject and predicate values.
+        </td>
+      </tr>
+
+      <tr>
+        <td class="nowrap fname">sem:subject-for-object-predicate</td>
+        <td class="parameters">$o as xs:string*,<br/>
+          $p as xs:string+</td>
+        <td class="returnType">xs:string*</td>
+        <td class="description">
+          This function returns the subject values of all tuples
+          that match the supplied object and predicate values.
+        </td>
+      </tr>
+
+      <tr>
+        <td class="nowrap fname">sem:subject-for-subject-predicate</td>
+        <td class="parameters">$s as xs:string*,<br/>
+          $p as xs:string+</td>
+        <td class="returnType">xs:string*</td>
+        <td class="description">
+          This function returns the subject values of all tuples
+          that match the supplied subject and predicate values.
+        </td>
+      </tr>
+
+      <tr>
+        <td class="nowrap fname">sem:object-by-subject-object-predicate</td>
+        <td class="parameters">$s as xs:string+,
+          $o as xs:string+,
+          $p as xs:string+</td>
+        <td class="returnType">xs:string*</td>
+        <td class="description">
+          This function returns the object values of all tuples
+          that match the supplied subject, object, and predicate values.
+        </td>
+      </tr>
+
+      <tr>
+        <td class="nowrap fname">sem:subject-by-subject-object-predicate</td>
+        <td class="parameters">$s as xs:string+,
+          $o as xs:string+,
+          $p as xs:string+</td>
+        <td class="returnType">xs:string*</td>
+        <td class="description">
+          This function returns the subject values of all tuples
+          that match the supplied subject, object, and predicate values.
+        </td>
+      </tr>
+
+      <tr>
+        <td class="nowrap fname">sem:transitive-closure</td>
+        <td class="parameters">$m as map:map,<br/>
+          $seeds as xs:string*,<br/>
+          $gen as xs:integer,
+          $relation as xs:string,<br/>
+          $direction as xs:boolean,<br/>
+          $filters as xs:string*</td>
+        <td class="returnType">empty-sequence()</td>
+        <td class="description">
+          This function performs transitive closure over an edge type.
+          This can be used for friend-of-a-friend (FOAF) queries:
+          see <a href="index.html">the library overview</a> for an example.
+          The resulting network is used to populate the supplied map,
+          which can be serialized using <code>sem:serialize()</code>.
+        </td>
+      </tr>
+
+      <tr>
+        <td class="nowrap fname">sem:serialize</td>
+        <td class="parameters">$m as map:map,<br/>
+          $max-gen as xs:integer</td>
+        <td class="returnType">item()+</td>
+        <td class="description">
+          This function serializes the network map created by
+          <code>sem:transitive-closure()</code>.
+        </td>
+      </tr>
+
+      <tr>
+        <td class="nowrap fname">sem:object-predicate-join</td>
+        <td class="parameters">$o as xs:string*,
+          $p as xs:string*</td>
+        <td class="returnType">element(sem:join)?</td>
+        <td class="description">
+          This function returns an XML element
+          which describes a join on the supplied object and predicate values.
+          Use this with the
+          <code>sem:subject-for-join()</code>
+          and
+          <code>sem:object-for-join()</code>
+          functions.
+        </td>
+      </tr>
+
+      <tr>
+        <td class="nowrap fname">sem:predicate-join</td>
+        <td class="parameters">$p as xs:string*</td>
+        <td class="returnType">element(sem:join)?</td>
+        <td class="description">
+          This function returns an XML element
+          which describes a join on the supplied predicate values.
+          Use this with the
+          <code>sem:subject-for-join()</code>
+          and
+          <code>sem:object-for-join()</code>
+          functions.
+        </td>
+      </tr>
+
+      <tr>
+        <td class="nowrap fname">sem:subject-predicate-join</td>
+        <td class="parameters">$s as xs:string*,
+          $p as xs:string*</td>
+        <td class="returnType">element(sem:join)?</td>
+        <td class="description">
+          This function returns an XML element
+          which describes a join on the supplied subject and predicate values.
+          Use this with the
+          <code>sem:subject-for-join()</code>
+          and
+          <code>sem:object-for-join()</code>
+          functions.
+        </td>
+      </tr>
+
+      <tr>
+        <td class="nowrap fname">sem:type-join</td>
+        <td class="parameters">$type as xs:string+</td>
+        <td class="returnType">element(sem:join)</td>
+        <td class="description">
+          This function returns an XML element
+          which describes a join on the supplied RDF type values.
+          This is equivalent to
+          <code>
+            sem:object-predicate-join($type, $sem:P-RDF-TYPE)
+          </code>
+          Use this with the
+          <code>sem:subject-for-join()</code>
+          and
+          <code>sem:object-for-join()</code>
+          functions.
+        </td>
+      </tr>
+
+      <tr>
+        <td class="nowrap fname">sem:object-for-join</td>
+        <td class="parameters">$joins as element(sem:join)+</td>
+        <td class="returnType">xs:string*</td>
+        <td class="description">
+          This function returns object values
+          of all tuples matching the supplied <code>
+            sem:join
+            </code>
+          elements.
+          These elements can be generated using the constructors
+          described above.
+        </td>
+      </tr>
+
+      <tr>
+        <td class="nowrap fname">sem:object-for-join</td>
+        <td class="parameters">$seeds as xs:string*,
+          $joins as element(sem:join)*</td>
+        <td class="returnType">xs:string*</td>
+        <td class="description">
+          This function returns object values
+          of all tuples matching the supplied <code>
+            sem:join
+            </code>
+          elements, starting from the supplied seed values.
+          These elements can be generated using the constructors
+          described above.
+        </td>
+      </tr>
+
+      <tr>
+        <td class="nowrap fname">sem:subject-for-join</td>
+        <td class="parameters">$joins as element(sem:join)+</td>
+        <td class="returnType">xs:string*</td>
+        <td class="description">
+          This function returns subject values
+          of all tuples matching the supplied <code>
+            sem:join
+            </code>
+          elements.
+          These elements can be generated using the constructors
+          described above.
+        </td>
+      </tr>
+
+      <tr>
+        <td class="nowrap fname">sem:subject-for-join</td>
+        <td class="parameters">$seeds as xs:string*,
+          $joins as element(sem:join)*</td>
+        <td class="returnType">xs:string*</td>
+        <td class="description">
+          This function returns subject values
+          of all tuples matching the supplied <code>
+            sem:join
+            </code>
+          elements, starting from the supplied seed values.
+          These elements can be generated using the constructors
+          described above.
+        </td>
+      </tr>
+
+      <tr>
+        <td class="nowrap fname">sem:owl-on-property</td>
+        <td class="parameters">$prop as xs:string*</td>
+        <td class="returnType">xs:string*</td>
+        <td class="description">
+          This function uses the OWL onProperty predicate
+          to find subject values matching the supplied property.
+        </td>
+      </tr>
+
+      <tr>
+        <td class="nowrap fname">sem:owl-subclasses</td>
+        <td class="parameters">$class as xs:string*</td>
+        <td class="returnType">xs:string*</td>
+        <td class="description">
+          This function expands any available OWL ontology
+          for the supplied class value.
+        </td>
+      </tr>
+
+      <tr>
+        <td class="nowrap fname">sem:rdf-subclasses</td>
+        <td class="parameters">$class as xs:string*</td>
+        <td class="returnType">xs:string*</td>
+        <td class="description">
+          This function uses the RDF subClassOf predicate
+          to expand the definition of the supplied class.
+        </td>
+      </tr>
+
+      <tr>
+        <td class="nowrap fname">sem:rdf-subproperties</td>
+        <td class="parameters">$prop as xs:string*</td>
+        <td class="returnType">xs:string*</td>
+        <td class="description">
+          This function uses the RDF subPropertyOf predicate
+          to recursively expand the ancestor properties
+          of the supplied property.
+        </td>
+      </tr>
+
+      <tr>
+        <td class="nowrap fname">sem:relate</td>
+        <td class="parameters">$a as xs:QName,
+          $b as xs:QName,
+          $a-seed as xs:string*,
+          $b-seed as xs:string*,
+          $join as element(sem:join)*</td>
+        <td class="returnType">map:map</td>
+        <td class="description">
+          This function populates a map
+          representing the co-occurrences of values
+          in the supplied elements ($a and $b),
+          using the supplied seed values and joins.
+        </td>
+      </tr>
+
+      <tr>
+        <td class="nowrap fname">sem:relate-join</td>
+        <td class="parameters">$a as xs:QName,
+          $b as xs:QName,
+          $a-seed as xs:string*,
+          $b-seed as xs:string*,
+          $join as element(sem:join)*</td>
+        <td class="returnType">element(cts:co-occurrence)*</td>
+        <td class="description">
+          This function returns an XML representation
+          of the co-occurrences of values
+          in the supplied elements ($a and $b),
+          using the supplied seed values and joins.
+        </td>
+      </tr>
+
+      <tr>
+        <td class="nowrap fname">sem:uri-for-tuple</td>
+        <td class="parameters">$s as xs:string,
+          $p as xs:string,
+          $o as xs:string,
+          $c as xs:string?</td>
+        <td class="returnType">xs:string</td>
+        <td class="description">
+          This function generates a unique document URI
+          from the supplied
+          subject, predicate, object, and (optional) context.
+        </td>
+      </tr>
+
+      <tr>
+        <td class="nowrap fname">sem:uri-for-tuple</td>
+        <td class="parameters">$t as element(t)</td>
+        <td class="returnType">xs:string</td>
+        <td class="description">
+          This function generates a unique document URI
+          from the supplied tuple element.
+        </td>
+      </tr>
+
+      <tr>
+        <td class="nowrap fname">sem:tuple</td>
+        <td class="parameters">$s as xs:string,
+          $p as xs:string,
+          $o as xs:string,
+          $c as xs:string?</td>
+        <td class="returnType">element(t)</td>
+        <td class="description">
+          This function creates a tuple element from the supplied
+          subject, predicate, object, and (optional) context.
+        </td>
+      </tr>
+
+      <tr>
+        <td class="nowrap fname">sem:tuple-insert</td>
+        <td class="parameters">$s as xs:string,
+          $p as xs:string,
+          $o as xs:string,
+          $c as xs:string?</td>
+        <td class="returnType">empty-sequence()</td>
+        <td class="description">
+          This function inserts a new tuple into the current database,
+          using the supplied
+          subject, predicate, object, and (optional) context.
+          The tuple will include hash attributes,
+          and its document URI will be generated automatically.
+        </td>
+      </tr>
+
+      <tr>
+        <td class="nowrap fname">sem:tuple-insert</td>
+        <td class="parameters">$t as element(t)</td>
+        <td class="returnType">empty-sequence()</td>
+        <td class="description">
+          This function inserts a new tuple into the current database.
+          The tuple must contain children s, o, and p;
+          it may contain a child c.
+          The tuple will be rewritten to include hash attributes,
+          and its document URI will be generated automatically.
+        </td>
+      </tr>
+
+      <tr>
+        <td class="nowrap fname">sem:tuples-for-query</td>
+        <td class="parameters">$q as cts:query</td>
+        <td class="returnType">element(t)*</td>
+        <td class="description">
+          This function returns all tuple elements
+          matching the supplied query.
+          The query may be generated
+          using standard <code>
+            cts:query
+            </code>
+          constructors.
+        </td>
+      </tr>
+
+      <tr>
+        <td class="nowrap fname">sem:tuples-for-predicate</td>
+        <td class="parameters">$p as xs:string+</td>
+        <td class="returnType">element(t)*</td>
+        <td class="description">
+          This function returns all tuple elements
+          matching the supplied predicate values.
+        </td>
+      </tr>
+
+    </table>
+
+  </body>
+</html>

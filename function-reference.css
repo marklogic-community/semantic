@@ -1,0 +1,57 @@
+/* Copyright (c) 2010 Mark Logic Corporation. All Rights Reserved.
+ *
+ * @author Michael Blakeley
+ *
+ */
+
+table
+{
+    width: 100%;
+    margin: 0.1em;
+    padding: 0.1em;
+    border: 1px solid black;
+}
+
+tr
+{
+}
+
+th
+{
+    border: 1px solid black;
+}
+
+td
+{
+    vertical-align: top;
+    border: 1px solid black;
+}
+
+.nowrap
+{
+    white-space: pre; /* CSS2 */
+}
+
+.fname
+{
+    font-weight: bold;
+}
+
+.vname
+{
+    font-weight: bold;
+}
+
+.parameters
+{
+}
+
+.returnType
+{
+}
+
+.description
+{
+}
+
+/* function-reference.css */
