@@ -798,6 +798,13 @@ as xs:string
       string-join(($s, $p, $o, $c), '|') ) )
 };
 
+declare function sem:uri-for-tuple(
+  $t as element(t) )
+as xs:string
+{
+  sem:uri-for-tuple($t/s, $t/p, $t/o, $t/c)
+};
+
 declare function sem:tuple(
   $s as xs:string,
   $p as xs:string,
@@ -832,6 +839,15 @@ as empty-sequence()
   xdmp:document-insert(
     sem:uri-for-tuple($s, $p, $o, $c),
     sem:tuple($s, $p, $o, $c) )
+};
+
+declare function sem:tuple-insert(
+  $t as element(t))
+as empty-sequence()
+{
+  xdmp:document-insert(
+    sem:uri-for-tuple($t/s, $t/p, $t/o, $t/c),
+    sem:tuple($t/s, $t/p, $t/o, $t/c) )
 };
 
 declare function sem:tuples-for-query(
