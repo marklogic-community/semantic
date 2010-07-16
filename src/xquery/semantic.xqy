@@ -52,6 +52,14 @@ declare variable $sem:QN-C := xs:QName('c')
 declare variable $sem:QN-H := xs:QName('h')
 ;
 
+declare variable $sem:O-OWL-CLASS :=
+'http://www.w3.org/2002/07/owl#Class'
+;
+
+declare variable $sem:O-OWL-OBJECT-PROPERTY :=
+'http://www.w3.org/2002/07/owl#ObjectProperty'
+;
+
 declare variable $sem:O-RDF-NIL :=
 'http://www.w3.org/1999/02/22-rdf-syntax-ns#nil'
 ;
@@ -106,6 +114,9 @@ declare private function sem:ev(
   $qn as xs:QName+, $query as cts:query)
 as xs:string*
 {
+  if (not($sem:DEBUG)) then ()
+  else xdmp:log(text { 'sem:ev', xdmp:describe($qn), xdmp:quote($query) })
+  ,
   cts:element-values(
     $qn, (), $sem:LEXICON-OPTIONS, $query)
 };
@@ -154,6 +165,22 @@ as xs:string*
   else sem:ev($sem:QN-O, sem:pq($p))
 };
 
+declare function sem:subject-for-predicate(
+  $p as xs:string+)
+as xs:string*
+{
+  if (empty($p)) then ()
+  else sem:ev($sem:QN-S, sem:pq($p))
+};
+
+declare function sem:object-for-object-predicate(
+  $s as xs:string*, $p as xs:string+)
+as xs:string*
+{
+  if (empty($s)) then ()
+  else sem:ev($sem:QN-O, sem:opq($s, $p))
+};
+
 declare function sem:object-for-subject-predicate(
   $s as xs:string*, $p as xs:string+)
 as xs:string*
@@ -166,6 +193,9 @@ declare function sem:subject-for-object-predicate(
    $o as xs:string*, $p as xs:string+)
 as xs:string*
 {
+  if (not($sem:DEBUG)) then ()
+  else xdmp:log(text { 'sem:subject-for-object-predicate', $o, $p })
+  ,
   if (empty($o)) then ()
   else sem:ev($sem:QN-S, sem:opq($o, $p))
 };
@@ -196,28 +226,7 @@ as xs:string*
   sem:ev($sem:QN-S, sem:sopq($s, $o, $p))
 };
 
-declare function sem:object-for-subject-predicate-hash(
-  $s as xs:unsignedLong+, $p as xs:unsignedLong+)
-as xs:unsignedLong*
-{
-  sem:hv($sem:QN-O, sem:spq($s, $p))
-};
-
-declare function sem:subject-for-object-predicate-hash(
-  $o as xs:unsignedLong+, $p as xs:unsignedLong+)
-as xs:unsignedLong*
-{
-  sem:hv($sem:QN-S, sem:opq($o, $p))
-};
-
-declare function sem:subject-for-subject-predicate-hash(
-  $s as xs:unsignedLong+, $p as xs:unsignedLong+)
-as xs:unsignedLong*
-{
-  sem:hv($sem:QN-S, sem:spq($s, $p))
-};
-
-declare function sem:transitive-closure-filter(
+declare private function sem:transitive-closure-filter(
   $m as map:map, $candidates as xs:string*,
   $filters as xs:string*, $gen as xs:integer)
  as xs:string*
@@ -323,141 +332,6 @@ declare function sem:serialize(
   else xdmp:log(text { 'serialize end', $max-gen })
 };
 
-declare function sem:hash-decode(
-  $qn as xs:QName+, $hashes as xs:unsignedLong+)
- as xs:string+
-{
-  sem:ev($qn, sem:hq($qn, $hashes))
-};
-
-declare function sem:serialize-hash-simple(
-  $m as map:map, $max-gen as xs:integer)
- as item()*
-{
-  let $keys := map:keys($m)
-  let $keys-count := count($keys)
-  let $d := (
-    if (not($sem:DEBUG)) then ()
-    else xdmp:log(text { 'serialize-hash-simple', $keys-count })
-  )
-  return (
-    $keys-count,
-    sem:hash-decode($sem:QN-S, xs:unsignedLong($keys))
-  ),
-  if (not($sem:DEBUG)) then ()
-  else xdmp:log(text { 'serialize-hash-simple end', $max-gen })
-};
-
-declare function sem:serialize-hash(
-  $m as map:map, $max-gen as xs:integer)
- as item()*
-{
-  let $keys := map:keys($m)
-  let $keys-count := count($keys)
-  let $d := (
-    if (not($sem:DEBUG)) then ()
-    else xdmp:log(text { 'serialize-hash', $max-gen, $keys-count })
-  )
-  return (
-    $keys-count,
-    let $values := sem:hash-decode($sem:QN-S, xs:unsignedLong($keys))
-    for $v in $values
-    let $gen := $max-gen - map:get($m, xs:string(xdmp:hash64($v)))
-    order by $gen descending, $v
-    return text { $gen, $v }
-  ),
-  if (not($sem:DEBUG)) then ()
-  else xdmp:log(text { 'serialize-hash end', $max-gen })
-};
-
-declare function sem:transitive-closure-hash-filter(
-  $m as map:map, $candidates as xs:unsignedLong*,
-  $filters as xs:unsignedLong*, $gen as xs:integer)
- as xs:unsignedLong*
-{
-  (: use lexicons to filter :)
-  (: are we done yet? :)
-  if (empty($candidates)) then ()
-  else if (empty($filters)) then (
-    if (not($sem:DEBUG)) then ()
-    else xdmp:log(text {
-        'transitive-closure-hash-filter put', $gen, count($candidates) }),
-    (: update the map :)
-    for $c in $candidates
-    let $key := string($c)
-    where empty(map:get($m, $key))
-    return (
-      map:put($m, $key, $gen),
-      (: yields sequence of filtered candidates from this generation :)
-      $c
-    )
-  )
-  else (
-    let $this := $filters[1]
-    let $rest := subsequence($filters, 2)
-    let $next := sem:subject-for-subject-predicate-hash($candidates, $this)
-    let $d := (
-      if (not($sem:DEBUG)) then ()
-      else xdmp:log(text {
-          'transitive-closure-hash-filter gen',
-          $gen, count($candidates), count($filters) })
-    )
-    where exists($next)
-    return sem:transitive-closure-hash-filter($m, $next, $rest, $gen)
-  )
-};
-
-declare function sem:transitive-closure-hash(
-  $m as map:map, $seeds as xs:unsignedLong*, $gen as xs:integer,
-  $relation as xs:unsignedLong, $direction as xs:boolean,
-  $filters as xs:unsignedLong*)
- as empty-sequence()
-{
-  if (not($sem:DEBUG)) then ()
-  else xdmp:log(text {
-      'transitive-closure-hash start of gen',
-      $gen, count($seeds), count(map:keys($m)) }),
-  (: apply dummy empty filter, on bootstrap generation only :)
-  if (exists(map:keys($m))) then () else (
-    let $do := sem:transitive-closure-hash-filter($m, $seeds, (), $gen)
-    return ()
-  ),
-  (: are we done yet? :)
-  if ($gen lt 1 or empty($seeds)) then (
-    if (not($sem:DEBUG)) then ()
-    else xdmp:log(text {
-        'transitive-closure-hash end at gen',
-        $gen, count($seeds), count(map:keys($m)) })
-  )
-  else (
-    (: get the next generation of friends :)
-    let $new-friends := (
-      if ($direction) then sem:object-for-subject-predicate-hash(
-        $seeds, $relation)
-      else sem:subject-for-object-predicate-hash($seeds, $relation)
-    )
-    let $d := (
-      if (not($sem:DEBUG)) then ()
-      else xdmp:log(text {
-        'transitive-closure-hash gen',
-          $gen, count($seeds), 'new', count($new-friends) })
-    )
-    let $next-gen := $gen - 1
-    (: transitive-closure-filter does the map:put, so always call it :)
-    let $new-friends := sem:transitive-closure-hash-filter(
-      $m, $new-friends, $filters, $next-gen)
-    let $d := (
-      if (not($sem:DEBUG)) then ()
-      else xdmp:log(text {
-        'transitive-closure-hash gen',
-          $gen, count($seeds), 'filtered', count($new-friends) })
-    )
-    where exists($new-friends) and $next-gen gt 0
-    return sem:transitive-closure-hash(
-      $m, $new-friends, $next-gen, $relation, $direction, $filters)
-  )
-};
-
 declare function sem:object-predicate-join(
   $o as xs:string*,
   $p as xs:string* )
@@ -508,10 +382,21 @@ declare function sem:object-for-join(
     sem:object-for-join($joins[1]),
     subsequence($joins, 2) )
   (: single join :)
-  else if ($joins/sem:o) then sem:subject-for-object-predicate(
+  else if ($joins/sem:o) then sem:object-for-object-predicate(
       $joins/sem:o, $joins/sem:p)
   else if ($joins/sem:s) then sem:object-for-subject-predicate(
       $joins/sem:s, $joins/sem:p)
+  else if ($joins/sem:select) then (
+    if ($joins/sem:select/@type
+      eq 'subject') then sem:object-for-subject-predicate(
+      sem:select($joins/sem:select), $joins/sem:p)
+    else if ($joins/sem:select/@type
+      eq 'object') then sem:object-for-object-predicate(
+      sem:select($joins/sem:select), $joins/sem:p)
+    else error(
+      (), 'SEM-UNEXPECTED', text {
+        'select type must be subject or object' })
+  )
   (: TODO handle other join cases? :)
   else error(
     (), 'SEM-UNEXPECTED',
@@ -533,7 +418,7 @@ declare function sem:object-for-join(
 };
 
 
-declare function sem:object-for-join(
+declare private function sem:object-for-join(
   $seeds as xs:string*,
   $first as element(sem:join),
   $joins as element(sem:join)* )
@@ -543,7 +428,7 @@ declare function sem:object-for-join(
     $seeds, $first/sem:s, $first/sem:o, $first/sem:p, $joins)
 };
 
-declare function sem:object-for-join(
+declare private function sem:object-for-join(
   $seeds as xs:string*,
   $s as xs:string*,
   $o as xs:string*,
@@ -580,8 +465,19 @@ declare function sem:subject-for-join(
   (: single join :)
   else if ($joins/sem:o) then sem:subject-for-object-predicate(
       $joins/sem:o, $joins/sem:p)
-  else if ($joins/sem:s) then sem:object-for-subject-predicate(
+  else if ($joins/sem:s) then sem:subject-for-subject-predicate(
       $joins/sem:s, $joins/sem:p)
+  else if ($joins/sem:select) then (
+    if ($joins/sem:select/@type
+      eq 'subject') then sem:subject-for-subject-predicate(
+      sem:select($joins/sem:select), $joins/sem:p)
+    else if ($joins/sem:select/@type
+      eq 'object') then sem:subject-for-object-predicate(
+      sem:select($joins/sem:select), $joins/sem:p)
+    else error(
+      (), 'SEM-UNEXPECTED', text {
+        'select type must be subject or object' })
+  )
   (: TODO handle other join cases? :)
   else error(
     (), 'SEM-UNEXPECTED',
@@ -603,7 +499,7 @@ declare function sem:subject-for-join(
 };
 
 
-declare function sem:subject-for-join(
+declare private function sem:subject-for-join(
   $seeds as xs:string*,
   $first as element(sem:join),
   $joins as element(sem:join)* )
@@ -613,7 +509,7 @@ declare function sem:subject-for-join(
     $seeds, $first/sem:s, $first/sem:o, $first/sem:p, $joins)
 };
 
-declare function sem:subject-for-join(
+declare private function sem:subject-for-join(
   $seeds as xs:string*,
   $s as xs:string*,
   $o as xs:string*,
@@ -656,7 +552,7 @@ as xs:string*
       sem:owl-subclasses-implicit($class) ))
 };
 
-declare function sem:owl-subclasses-implicit(
+declare private function sem:owl-subclasses-implicit(
   $class as xs:string*)
 as xs:string*
 {
@@ -721,7 +617,7 @@ as map:map
   )
 };
 
-declare function sem:relate-query(
+declare private function sem:relate-query(
   $a as xs:QName,
   $b as xs:QName,
   $a-seed as xs:string*,
@@ -741,7 +637,7 @@ as cts:query
         ) ) )
 };
 
-declare function sem:relate(
+declare private function sem:relate(
   $a as xs:QName, $b as xs:QName,
   $query as cts:query,
   $m as map:map)
@@ -755,14 +651,14 @@ as map:map
   $m
 };
 
-declare function sem:relate(
+declare private function sem:relate(
   $m as map:map, $co as element(cts:co-occurrence) )
 as empty-sequence()
 {
   map:put($m, $co/cts:value[1], $co/cts:value[2]/string())
 };
 
-declare function sem:relate-join(
+declare private function sem:relate-join(
   $a as xs:QName, $b as xs:QName,
   $query as cts:query )
 as element(cts:co-occurrence)*
@@ -862,6 +758,23 @@ declare function sem:tuples-for-predicate(
 as element(t)*
 {
   sem:tuples-for-query(sem:pq($p))
+};
+
+declare function sem:select(
+  $s as element(sem:select))
+{
+  sem:select($s/@type, $s/sem:join)
+};
+
+declare function sem:select(
+  $type as xs:string,
+  $join as element(sem:join)+)
+{
+  if ($type eq 'subject') then sem:subject-for-join($join)
+  else if ($type eq 'object') then sem:object-for-join($join)
+  else error((), 'SEM-UNEXPECTED', text {
+      'select must have type subject or object, not',
+      xdmp:describe($type) })
 };
 
 (: semantic.xqy :)

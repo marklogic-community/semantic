@@ -28,29 +28,14 @@ import module namespace sem="http://marklogic.com/semantic"
 declare variable $SINDICE-FRIEND := 'http://xmlns.com/foaf/0.1/knows'
 ;
 
-declare variable $SINDICE-FRIEND-HASH := xdmp:hash64($sem:SINDICE-FRIEND)
+declare variable $SINDICE-FRIEND-HASH := xdmp:hash64($SINDICE-FRIEND)
 ;
 
 let $seeds as xs:string+ := xdmp:get-request-field('seed')
 let $filters as xs:string* := xdmp:get-request-field('filter')
-let $use-hash as xs:boolean := xs:boolean(
-  xdmp:get-request-field('hash', '1') )
 let $gen as xs:integer := xs:integer(
   xdmp:get-request-field('gen', '6'))
 let $m := map:map()
-let $do := (
-  if (not($use-hash)) then sem:transitive-closure(
-    $m, $seeds, $gen, $sem:SINDICE-FRIEND, true(), $filters )
-  else sem:transitive-closure-hash(
-    $m,
-    for $i in xdmp:hash64($seeds)
-    order by $i
-    return $i
-    ,
-    $gen, $sem:SINDICE-FRIEND-HASH, true(),
-    for $i in xdmp:hash64($filters)
-    order by $i
-    return $i
-  )
-)
+let $do := sem:transitive-closure(
+  $m, $seeds, $gen, $SINDICE-FRIEND, true(), $filters)
 return count(map:keys($m))

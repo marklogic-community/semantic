@@ -49,15 +49,19 @@ declare variable $FORESTS as xs:unsignedLong+ := (
 declare variable $FOREST-COUNT := count($FORESTS)
 ;
 
+(: map key is forest id, chosen from the local forests.
+ : map value is a list of the documents to be inserted.
+ :)
 declare variable $MAP as map:map := (
   let $m := map:map()
   let $build := (
     for $n in xdmp:unquote(
       xdmp:get-request-field('xml') )/t
-    let $key := sem:uri-for-tuple($n/s, $n/p, $n/o, $n/c)
-    where empty(map:get($m, $key))
-    return map:put(
-      $m, $key, sem:tuple($n/s, $n/p, $n/o, $n/c) )
+    let $forest := local:forest(
+      xdmp:hex-to-integer(
+        sem:uri-for-tuple($n/s, $n/p, $n/o, $n/c) ) )
+    let $key := xs:string($forest)
+    return map:put($m, $key, (map:get($m, $key), $n))
   )
   return $m
 );
@@ -85,15 +89,12 @@ as xs:integer
 
 (: NB - in-forest eval per tuple :)
 for $key in map:keys($MAP)
+let $forest := xs:unsignedLong($key)
 return xdmp:invoke(
-  'insert-tuple.xqy',
-  (xs:QName('URI'), $key,
-    xs:QName('NODE'), map:get($MAP, $key),
-    xs:QName('SKIP-EXISTING'), false() ),
+  'insert-tuples.xqy',
+  (xs:QName('FOREST'), $forest,
+    xs:QName('MAP'), $MAP),
     <options xmlns="xdmp:eval">{
-    element database {
-      local:forest(xdmp:hex-to-integer($key)) }
-    }</options>
-)
+      element database { $forest } }</options> )
 
 (: semantic insert.xqy :)
