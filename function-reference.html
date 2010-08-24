@@ -54,6 +54,13 @@
     <table summary="Constants">
       <tr><th>Constant</th><th>Description</th></tr>
       <tr>
+        <td class="nowrap vname">$sem:O-RDF-CLASS</td>
+        <td class="description">This constant represents the RDF <code>
+            Class
+          </code>
+          object.</td>
+      </tr>
+      <tr>
         <td class="nowrap vname">$sem:O-RDF-NIL</td>
         <td class="description">This constant represents the RDF <code>
             nil
@@ -135,6 +142,16 @@
         <td class="returnType">xs:string*</td>
         <td class="description">
           This function returns the object values of all tuples
+          that match the supplied predicate values.
+        </td>
+      </tr>
+
+      <tr>
+        <td class="nowrap fname">sem:subject-for-predicate</td>
+        <td class="parameters">$p as xs:string+</td>
+        <td class="returnType">xs:string*</td>
+        <td class="description">
+          This function returns the subject values of all tuples
           that match the supplied predicate values.
         </td>
       </tr>
