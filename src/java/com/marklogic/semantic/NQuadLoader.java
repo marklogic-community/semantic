@@ -61,7 +61,7 @@ public class NQuadLoader extends AbstractLoader {
 
     private static final int OBJECT = 2;
 
-    private static final String VERSION = "2010-05-25.5";
+    private static final String VERSION = "2010-08-24.1";
 
     private boolean detectDecimal = false;
 
@@ -501,7 +501,10 @@ public class NQuadLoader extends AbstractLoader {
                     try {
                         Thread.sleep(sleepMillis);
                     } catch (InterruptedException e1) {
+                        // reset interrupt status and throw the error
+                        Thread.interrupted();
                         logger.warning("interrupted: " + e1.getMessage());
+                        throw e;
                     }
                     tries++;
                     sleepMillis = 2 * sleepMillis;
