@@ -136,6 +136,20 @@ declare private function sem:pq(
   sem:hq($sem:QN-P, xdmp:hash64($p))
 };
 
+declare private function sem:oq(
+  $o as xs:string+)
+ as cts:query
+{
+  sem:rq($sem:QN-O, $o)
+};
+
+declare private function sem:sq(
+  $s as xs:string+)
+ as cts:query
+{
+  sem:rq($sem:QN-S, $s)
+};
+
 declare private function sem:opq(
   $o as xs:string+, $p as xs:string+)
  as cts:query
@@ -758,6 +772,20 @@ declare function sem:tuples-for-predicate(
 as element(t)*
 {
   sem:tuples-for-query(sem:pq($p))
+};
+
+declare function sem:tuples-for-subject(
+  $s as xs:string+ )
+as element(t)*
+{
+  sem:tuples-for-query(sem:sq($s))
+};
+
+declare function sem:tuples-for-object(
+  $o as xs:string+ )
+as element(t)*
+{
+  sem:tuples-for-query(sem:oq($o))
 };
 
 declare function sem:select(

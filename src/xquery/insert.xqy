@@ -57,35 +57,14 @@ declare variable $MAP as map:map := (
   let $build := (
     for $n in xdmp:unquote(
       xdmp:get-request-field('xml') )/t
-    let $forest := local:forest(
-      xdmp:hex-to-integer(
-        sem:uri-for-tuple($n/s, $n/p, $n/o, $n/c) ) )
-    let $key := xs:string($forest)
+    let $forest-index := xdmp:document-assign(
+      sem:uri-for-tuple($n/s, $n/p, $n/o, $n/c),
+      $FOREST-COUNT )
+    let $key := xs:string(subsequence($FORESTS, $forest-index, 1))
     return map:put($m, $key, (map:get($m, $key), $n))
   )
   return $m
 );
-
-declare function local:forest(
-  $uri-key as xs:unsignedLong )
-as xs:integer
-{
-  (: mimic server builtin assignment placing :)
-  subsequence(
-    $FORESTS,
-    1 + (
-      let $v := (2047 + $FOREST-COUNT) idiv $FOREST-COUNT
-      let $u := xdmp:xor64(0, xdmp:and64(xdmp:lshift64($uri-key, 2), 2047))
-      let $u := xdmp:xor64($u, xdmp:and64(xdmp:rshift64($uri-key, 9), 2047))
-      let $u := xdmp:xor64($u, xdmp:and64(xdmp:rshift64($uri-key, 20), 2047))
-      let $u := xdmp:xor64($u, xdmp:and64(xdmp:rshift64($uri-key, 31), 2047))
-      let $u := xdmp:xor64($u, xdmp:and64(xdmp:rshift64($uri-key, 42), 2047))
-      let $u := xdmp:xor64($u, xdmp:and64(xdmp:rshift64($uri-key, 53), 2047))
-      return $u idiv $v
-    ),
-    1
-  )
-};
 
 (: NB - in-forest eval per tuple :)
 for $key in map:keys($MAP)
