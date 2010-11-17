@@ -32,9 +32,7 @@ declare variable $sem:DEBUG := false()
 ;
 
 declare variable $sem:LEXICON-OPTIONS := (
-  (: this is where we switch between docs and naked properties :)
-  if (1) then ()
-  else 'properties'
+  'any'
 );
 
 declare variable $sem:QN-S := xs:QName('s')
@@ -47,9 +45,6 @@ declare variable $sem:QN-P := xs:QName('p')
 ;
 
 declare variable $sem:QN-C := xs:QName('c')
-;
-
-declare variable $sem:QN-H := xs:QName('h')
 ;
 
 declare variable $sem:O-OWL-CLASS :=
@@ -103,13 +98,6 @@ as cts:query
   cts:element-range-query($qn, '=', $v)
 };
 
-declare private function sem:hq(
-  $qn as xs:QName+, $v as xs:unsignedLong+)
-as cts:query
-{
-  cts:element-attribute-range-query($qn, $sem:QN-H, '=', $v)
-};
-
 declare private function sem:ev(
   $qn as xs:QName+, $query as cts:query)
 as xs:string*
@@ -121,19 +109,11 @@ as xs:string*
     $qn, (), $sem:LEXICON-OPTIONS, $query)
 };
 
-declare private function sem:hv(
-  $qn as xs:QName+, $query as cts:query)
-as xs:unsignedLong*
-{
-  cts:element-attribute-values(
-    $qn, $QN-H, (), $sem:LEXICON-OPTIONS, $query)
-};
-
 declare private function sem:pq(
   $p as xs:string+)
  as cts:query
 {
-  sem:hq($sem:QN-P, xdmp:hash64($p))
+  sem:rq($sem:QN-P, $p)
 };
 
 declare private function sem:oq(
@@ -724,19 +704,27 @@ as element(t)
 {
   element t {
     element s {
-      attribute h { xdmp:hash64($s) },
       $s },
     element p {
-      attribute h { xdmp:hash64($p) },
       $p },
     element o {
-      attribute h { xdmp:hash64($o) },
       $o },
     if (empty($c)) then ()
     else element c {
-      attribute h { xdmp:hash64($c) },
       $c }
   }
+};
+
+declare function sem:tuple-insert-as-property(
+  $s as xs:string,
+  $p as xs:string,
+  $o as xs:string,
+  $c as xs:string?)
+as empty-sequence()
+{
+  xdmp:document-add-properties(
+    sem:uri-for-tuple($s, $p, $o, $c),
+    sem:tuple($s, $p, $o, $c)/* )
 };
 
 declare function sem:tuple-insert(
