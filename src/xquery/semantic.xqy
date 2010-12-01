@@ -91,6 +91,7 @@ declare variable $sem:P-RDF-TYPE :=
 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type'
 ;
 
+(: RangeQuery - returns a cts:element-range-query with the equal operator between $qn and $v :)
 declare private function sem:rq(
   $qn as xs:QName+, $v as xs:string+)
 as cts:query
@@ -98,6 +99,7 @@ as cts:query
   cts:element-range-query($qn, '=', $v)
 };
 
+(: EValuate - evaluates $query using cts:element-values and return qualified names specified in $qn from matching documents :)
 declare private function sem:ev(
   $qn as xs:QName+, $query as cts:query)
 as xs:string*
@@ -109,6 +111,7 @@ as xs:string*
     $qn, (), $sem:LEXICON-OPTIONS, $query)
 };
 
+(: PredicateQuery - returns a cts:query that matches predicates in $p :)
 declare private function sem:pq(
   $p as xs:string+)
  as cts:query
@@ -116,6 +119,7 @@ declare private function sem:pq(
   sem:rq($sem:QN-P, $p)
 };
 
+(: ObjectQuery - returns a cts:query that matches objects in $o :)
 declare private function sem:oq(
   $o as xs:string+)
  as cts:query
@@ -123,6 +127,7 @@ declare private function sem:oq(
   sem:rq($sem:QN-O, $o)
 };
 
+(: SubjectQuery - returns a cts:query that matches subjects in $s :)
 declare private function sem:sq(
   $s as xs:string+)
  as cts:query
@@ -130,6 +135,7 @@ declare private function sem:sq(
   sem:rq($sem:QN-S, $s)
 };
 
+(: ObjectPredicateQuery - returns a cts:query that matches objects in $o and predicates in $p:)
 declare private function sem:opq(
   $o as xs:string+, $p as xs:string+)
  as cts:query
@@ -137,6 +143,7 @@ declare private function sem:opq(
   cts:and-query((sem:rq($sem:QN-O, $o), sem:pq($p)))
 };
 
+(: SubjectPredicateQuery - returns a cts:query that matches subjects in $s and predicates in $p:)
 declare private function sem:spq(
   $s as xs:string+, $p as xs:string+)
  as cts:query
@@ -144,6 +151,7 @@ declare private function sem:spq(
   cts:and-query((sem:rq($sem:QN-S, $s), sem:pq($p)))
 };
 
+(: SubjectObjectPredicateQuery - returns a cts:query that matches subjects in $s, objects in $o, and predicates in $p:)
 declare private function sem:sopq(
   $s as xs:string+, $o as xs:string+, $p as xs:string+)
  as cts:query
@@ -151,6 +159,7 @@ declare private function sem:sopq(
   cts:and-query((sem:rq($sem:QN-S, $s), sem:rq($sem:QN-O, $o), sem:pq($p)))
 };
 
+(: returns objects that matches predicates in $p :) 
 declare function sem:object-for-predicate(
   $p as xs:string+)
 as xs:string*
@@ -159,6 +168,7 @@ as xs:string*
   else sem:ev($sem:QN-O, sem:pq($p))
 };
 
+(: returns subjects that matches predicates in $p :) 
 declare function sem:subject-for-predicate(
   $p as xs:string+)
 as xs:string*
@@ -167,6 +177,7 @@ as xs:string*
   else sem:ev($sem:QN-S, sem:pq($p))
 };
 
+(: returns objects that matches subjects in $s, and predicates in $p :) 
 declare function sem:object-for-object-predicate(
   $s as xs:string*, $p as xs:string+)
 as xs:string*
@@ -175,6 +186,7 @@ as xs:string*
   else sem:ev($sem:QN-O, sem:opq($s, $p))
 };
 
+(: returns objects that matches subjects in $s and predicates in $p :)
 declare function sem:object-for-subject-predicate(
   $s as xs:string*, $p as xs:string+)
 as xs:string*
@@ -183,6 +195,7 @@ as xs:string*
   else sem:ev($sem:QN-O, sem:spq($s, $p))
 };
 
+(: returns subjects that matches objects in $o and predicates in $p :)
 declare function sem:subject-for-object-predicate(
    $o as xs:string*, $p as xs:string+)
 as xs:string*
@@ -194,6 +207,7 @@ as xs:string*
   else sem:ev($sem:QN-S, sem:opq($o, $p))
 };
 
+(: returns subjects that matches subjects in $s and predicates in $p :)
 declare function sem:subject-for-subject-predicate(
    $s as xs:string*, $p as xs:string+)
 as xs:string*
@@ -202,6 +216,7 @@ as xs:string*
   else sem:ev($sem:QN-S, sem:spq($s, $p))
 };
 
+(: returns objects that matches subjects in $s, objects in $o, and predicates in $p :)
 declare function sem:object-by-subject-object-predicate(
   $s as xs:string+,
   $o as xs:string+,
@@ -211,6 +226,7 @@ as xs:string*
   sem:ev($sem:QN-O, sem:sopq($s, $o, $p))
 };
 
+(: returns subjects that matches subjects in $s, objects in $o, and predicates in $p :)
 declare function sem:subject-by-subject-object-predicate(
   $s as xs:string+,
   $o as xs:string+,
@@ -326,6 +342,10 @@ declare function sem:serialize(
   else xdmp:log(text { 'serialize end', $max-gen })
 };
 
+(: 
+returns a sem:join element that joins objects in $o and predicates in
+$p, sem:join is used in *-for-join functions
+:)
 declare function sem:object-predicate-join(
   $o as xs:string*,
   $p as xs:string* )
@@ -337,6 +357,10 @@ declare function sem:object-predicate-join(
     for $i in $o return element sem:o { $i } }
 };
 
+(: 
+returns a sem:join element that joins predicates in $p, sem:join is
+used in *-for-join functions
+:)
 declare function sem:predicate-join(
   $p as xs:string* )
  as element(sem:join)?
@@ -346,6 +370,10 @@ declare function sem:predicate-join(
     for $i in $p return element sem:p { $i } }
 };
 
+(: 
+returns a sem:join element that joins subjects in $s and predicates in
+$p, sem:join is used in *-for-join functions
+:)
 declare function sem:subject-predicate-join(
   $s as xs:string*,
   $p as xs:string* )
@@ -357,6 +385,10 @@ declare function sem:subject-predicate-join(
     for $i in $p return element sem:p { $i } }
 };
 
+(: 
+returns a sem:join element that joins objects in $type and predicates
+in $sem:P-RDF-TYPE
+:)
 declare function sem:type-join(
   $type as xs:string+)
 as element(sem:join)
@@ -364,6 +396,7 @@ as element(sem:join)
   sem:object-predicate-join($type, $sem:P-RDF-TYPE)
 };
 
+(: returns objects that matches the sem:join conditions in $joins :)
 (: substitute function calls for flwor, to maintain streaming :)
 declare function sem:object-for-join(
   $joins as element(sem:join)+)
@@ -397,6 +430,7 @@ declare function sem:object-for-join(
     text { 'cannot join without object-predicate or subject-predicate' })
 };
 
+(: returns objects that matches the sem:join conditions in $joins, search is limited to triples that match elements in $seeds :)
 (: substitute function calls for flwor, to maintain streaming :)
 declare function sem:object-for-join(
   $seeds as xs:string*,
@@ -412,6 +446,11 @@ declare function sem:object-for-join(
 };
 
 
+(: 
+returns objects that matches the sem:join conditions in $first, and
+then $joins, search is limited to triples that match elements in
+$seeds
+:)
 declare private function sem:object-for-join(
   $seeds as xs:string*,
   $first as element(sem:join),
@@ -422,6 +461,16 @@ declare private function sem:object-for-join(
     $seeds, $first/sem:s, $first/sem:o, $first/sem:p, $joins)
 };
 
+(: 
+returns objects that matches subjects in $s, objects in $o, predicates
+in $p, and then $joins.  Search is limited to triples that match
+element in $seeds.
+
+Note: It's unclear what is the correct return value if all 3 $s, $o,
+and $p are specified.  But it seems that if $o and $p are specified,
+then $seeds has to be a subject.  If $s and $p are specified, then
+$seeds have to be an object.
+:)
 declare private function sem:object-for-join(
   $seeds as xs:string*,
   $s as xs:string*,
@@ -445,6 +494,7 @@ declare private function sem:object-for-join(
   )
 };
 
+(: Same as object-for-join, except this returns objects instead of subjects :)
 (: substitute function calls for flwor, to maintain streaming :)
 declare function sem:subject-for-join(
   $joins as element(sem:join)+)
@@ -478,6 +528,7 @@ declare function sem:subject-for-join(
     text { 'cannot join without object-predicate or subject-predicate' })
 };
 
+(: Same as object-for-join, except this returns objects instead of subjects :)
 (: substitute function calls for flwor, to maintain streaming :)
 declare function sem:subject-for-join(
   $seeds as xs:string*,
@@ -493,6 +544,7 @@ declare function sem:subject-for-join(
 };
 
 
+(: Same as object-for-join, except this returns objects instead of subjects :)
 declare private function sem:subject-for-join(
   $seeds as xs:string*,
   $first as element(sem:join),
@@ -503,6 +555,7 @@ declare private function sem:subject-for-join(
     $seeds, $first/sem:s, $first/sem:o, $first/sem:p, $joins)
 };
 
+(: Same as object-for-join, except this returns objects instead of subjects :)
 declare private function sem:subject-for-join(
   $seeds as xs:string*,
   $s as xs:string*,
