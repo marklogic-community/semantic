@@ -768,18 +768,6 @@ as element(t)
   }
 };
 
-declare function sem:tuple-insert-as-property(
-  $s as xs:string,
-  $p as xs:string,
-  $o as xs:string,
-  $c as xs:string?)
-as empty-sequence()
-{
-  xdmp:document-add-properties(
-    sem:uri-for-tuple($s, $p, $o, $c),
-    sem:tuple($s, $p, $o, $c)/* )
-};
-
 declare function sem:tuple-insert(
   $s as xs:string,
   $p as xs:string,
