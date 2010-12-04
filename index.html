@@ -196,18 +196,17 @@ Here is a sample element, based on a triple from the
 </pre>
 
 <p>
-Note that when <code>insert.xqy</code> processes this XML,
-it will add an additional <code>@h</code> node to each leaf element.
-So the final XML will resemble this sample element.
+By default, this document is inserted as properties of an empty
+document.  This is also known as "naked properties".  You can use
+xdmp:document-properties() to inspect them after loading.  The above
+example would appear like this if you run xdmp:document-properties():
 </p>
-
 <pre>
-&lt;t&gt;
-  &lt;s h="9003403949735004823"&gt;http://www.Department17.University3.edu/UndergraduateStudent276&lt;/s&gt;
-  &lt;p h="265699856035360262"&gt;http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#emailAddress&lt;/p&gt;
-  &lt;o h="4189577431107767985"&gt;UndergraduateStudent276@Department17.University3.edu&lt;/o&gt;
-&lt;/t&gt;
+  &lt;s&gt;http://www.Department17.University3.edu/UndergraduateStudent276&lt;/s&gt;
+  &lt;p&gt;http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#emailAddress&lt;/p&gt;
+  &lt;o&gt;UndergraduateStudent276@Department17.University3.edu&lt;/o&gt;
 </pre>
+
 
 <p>
 You may also insert triples or quads manually,

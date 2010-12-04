@@ -481,6 +481,34 @@
       </tr>
 
       <tr>
+        <td class="nowrap fname">sem:tuple-insert-as-property</td>
+        <td class="parameters">$s as xs:string,
+          $p as xs:string,
+          $o as xs:string,
+          $c as xs:string?</td>
+        <td class="returnType">empty-sequence()</td>
+        <td class="description">
+          This function inserts a new tuple into the current database,
+          using the supplied subject, predicate, object, and
+          (optional) context.  The document URI will be generated
+          automatically.  The tuple is inserted as part of an empty
+          document's property fragment.  (aka naked properties)
+        </td>
+      </tr>
+
+      <tr>
+        <td class="nowrap fname">sem:tuple-insert-as-property</td>
+        <td class="parameters">$t as element(t)</td>
+        <td class="returnType">empty-sequence()</td>
+        <td class="description">
+          This function inserts a new tuple into the current database.
+          The tuple must contain children s, o, and p; it may contain
+          a child c.  The document URI will be generated
+          automatically.  The tuple is inserted as part of an empty
+          document's property fragment.  (aka naked properties)
+        </td>
+      </tr>
+      <tr>
         <td class="nowrap fname">sem:tuple-insert</td>
         <td class="parameters">$s as xs:string,
           $p as xs:string,
