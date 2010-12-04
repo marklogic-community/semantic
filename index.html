@@ -201,12 +201,21 @@ document.  This is also known as "naked properties".  You can use
 xdmp:document-properties() to inspect them after loading.  The above
 example would appear like this if you run xdmp:document-properties():
 </p>
+
 <pre>
+&lt;prop:properties xmlns:prop="http://marklogic.com/xdmp/property"&gt;
   &lt;s&gt;http://www.Department17.University3.edu/UndergraduateStudent276&lt;/s&gt;
   &lt;p&gt;http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#emailAddress&lt;/p&gt;
   &lt;o&gt;UndergraduateStudent276@Department17.University3.edu&lt;/o&gt;
+  &lt;prop:last-modified&gt;2010-12-03T19:12:53-08:00&lt;/prop:last-modified&gt;
+&lt;/prop:properties&gt;
 </pre>
 
+<p>
+You can change this default placement back to inserting as documents
+by modifying insert.xqy.  But this is not recommended because
+inserting triples as naked properties saves a fragement.
+</p>
 
 <p>
 You may also insert triples or quads manually,
