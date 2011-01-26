@@ -236,6 +236,12 @@ as xs:string*
   sem:ev($sem:QN-S, sem:sopq($s, $o, $p))
 };
 
+(:
+Take the list of $candidates, and filter them through $filters
+(predicates).  Filters are applied as AND-conditions.  Candidates that
+pass all filters are stored inside the map $m, with the key =
+candidate, and value = $gen.
+:)
 declare private function sem:transitive-closure-filter(
   $m as map:map, $candidates as xs:string*,
   $filters as xs:string*, $gen as xs:integer)
@@ -272,6 +278,16 @@ declare private function sem:transitive-closure-filter(
   )
 };
 
+(:
+ Find the transitive-closure, starting from $seeds, using $relation as the predicate for traversing edges.  
+ $m - This is used to store filtered results, where key = name, value = generation count
+ $seeds     - This stores unfiltered results, and it's used recursively for finding the next generation of friends
+ $gen       - An integer for counting generations
+ $relation  - the predicate used for finding relationships
+ $direction - If true, we traverse from subject to object.  If false, we traverse from object to subject
+ $filter    - Used to filter out results.  Note that filter only essentially apply to the end result.  
+              Friends that match the filter is still used to find the next generation of friends.
+:)
 declare function sem:transitive-closure(
   $m as map:map, $seeds as xs:string*, $gen as xs:integer,
   $relation as xs:string, $direction as xs:boolean, $filters as xs:string*)
