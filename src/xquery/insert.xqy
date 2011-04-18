@@ -71,7 +71,7 @@ for $key in map:keys($MAP)
 let $forest := xs:unsignedLong($key)
 return xdmp:invoke(
   'insert-tuples.xqy',
-  (xs:QName('AS-PROPERTY'), true(),
+  (xs:QName('AS-PROPERTY'), false(),
     xs:QName('FOREST'), $forest,
     xs:QName('MAP'), $MAP),
     <options xmlns="xdmp:eval">{
