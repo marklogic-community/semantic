@@ -726,28 +726,10 @@ declare private function sem:relate(
   $m as map:map)
 as map:map
 {
-  sem:relate(
-    $m, cts:element-value-co-occurrences(
-      $a, $b, $sem:LEXICON-OPTIONS, $query) ),
+  $m + cts:element-value-co-occurrences(
+    $a, $b, $sem:LEXICON-OPTIONS, $query ),
   if (not($sem:DEBUG)) then () else xdmp:log(
-    text { 'sem:relate', count(map:keys($m)) } ),
-  $m
-};
-
-declare private function sem:relate(
-  $m as map:map, $co as element(cts:co-occurrence) )
-as empty-sequence()
-{
-  map:put($m, $co/cts:value[1], $co/cts:value[2]/string())
-};
-
-declare private function sem:relate-join(
-  $a as xs:QName, $b as xs:QName,
-  $query as cts:query )
-as element(cts:co-occurrence)*
-{
-  cts:element-value-co-occurrences(
-    $a, $b, $sem:LEXICON-OPTIONS, $query)
+    text { 'sem:relate', count(map:keys($m)) } )
 };
 
 declare function sem:relate-join(
@@ -756,10 +738,10 @@ declare function sem:relate-join(
   $a-seed as xs:string*,
   $b-seed as xs:string*,
   $join as element(sem:join)* )
-as element(cts:co-occurrence)*
+as map:map
 {
-  sem:relate-join(
-    $a, $b,
+  cts:element-value-co-occurrences(
+    $a, $b, $sem:LEXICON-OPTIONS,
     sem:relate-query($a, $b, $a-seed, $b-seed, $join)
   )
 };
