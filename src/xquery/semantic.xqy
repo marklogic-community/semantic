@@ -774,15 +774,11 @@ declare function sem:tuple(
 as element(t)
 {
   element t {
-    element s {
-      $s },
-    element p {
-      $p },
-    element o {
-      $o },
+    element s { $s },
+    element p { $p },
+    element o { $o },
     if (empty($c)) then ()
-    else element c {
-      $c }
+    else element c { $c }
   }
 };
 
@@ -830,43 +826,14 @@ as empty-sequence()
 
 declare function sem:tuples-for-query(
   $q as cts:query )
-as element(t)*
-{
-  cts:search(/t, $q, 'unfiltered')
-};
-
-declare function sem:tuples-for-predicate(
-  $p as xs:string+ )
-as element(t)*
-{
-  sem:tuples-for-query(sem:pq($p))
-};
-
-declare function sem:tuples-for-subject(
-  $s as xs:string+ )
-as element(t)*
-{
-  sem:tuples-for-query(sem:sq($s))
-};
-
-declare function sem:tuples-for-object(
-  $o as xs:string+ )
-as element(t)*
-{
-  sem:tuples-for-query(sem:oq($o))
-};
-
-declare function sem:tuples-map-for-query(
-  $m as map:map,
-  $q as cts:query )
 as map:map
 {
+  let $m := map:map()
   let $build := (
     for $t in cts:search(/t, $q, 'unfiltered')
     let $tmap := map:map()
     let $build := (
-      for $i in $t/*
-      return map:put($tmap, local-name($i), $i/string()) )
+      $t/*/map:put($tmap, local-name(.), string(.)) )
     return map:put($m, xdmp:node-uri($t), $tmap)
   )
   return $m
@@ -876,13 +843,33 @@ declare function sem:tuples-map-for-query(
   $q as cts:query )
 as map:map
 {
-  sem:tuples-map-for-query(
-    map:map(),
-    $q )
+  sem:tuples-map-for-query($q)
+};
+
+declare function sem:tuples-for-predicate(
+  $p as xs:string+ )
+as map:map
+{
+  sem:tuples-for-query(sem:pq($p))
+};
+
+declare function sem:tuples-for-subject(
+  $s as xs:string+ )
+as map:map
+{
+  sem:tuples-for-query(sem:sq($s))
+};
+
+declare function sem:tuples-for-object(
+  $o as xs:string+ )
+as map:map
+{
+  sem:tuples-for-query(sem:oq($o))
 };
 
 declare function sem:select(
   $s as element(sem:select))
+as map:map
 {
   sem:select($s/@type, $s/sem:join)
 };
@@ -890,6 +877,7 @@ declare function sem:select(
 declare function sem:select(
   $type as xs:string,
   $join as element(sem:join)+)
+as map:map
 {
   if ($type eq 'subject') then sem:subject-for-join($join)
   else if ($type eq 'object') then sem:object-for-join($join)
