@@ -32,7 +32,7 @@ declare variable $sem:DEBUG := false()
 ;
 
 declare variable $sem:LEXICON-OPTIONS := (
-  'any'
+  'any', 'map'
 );
 
 declare variable $sem:QN-S := xs:QName('s')
@@ -93,16 +93,17 @@ declare variable $sem:P-RDF-TYPE :=
 
 (: RangeQuery - returns a cts:element-range-query with the equal operator between $qn and $v :)
 declare private function sem:rq(
-  $qn as xs:QName+, $v as xs:string+)
-as cts:query
+  $qn as xs:QName+, $v as xs:string*)
+as cts:query?
 {
-  cts:element-range-query($qn, '=', $v)
+  if (empty($v)) then ()
+  else cts:element-range-query($qn, '=', $v)
 };
 
 (: EValuate - evaluates $query using cts:element-values and return qualified names specified in $qn from matching documents :)
 declare private function sem:ev(
   $qn as xs:QName+, $query as cts:query)
-as xs:string*
+as map:map?
 {
   if (not($sem:DEBUG)) then ()
   else xdmp:log(text { 'sem:ev', xdmp:describe($qn), xdmp:quote($query) })
@@ -112,25 +113,25 @@ as xs:string*
 };
 
 (: PredicateQuery - returns a cts:query that matches predicates in $p :)
-declare private function sem:pq(
-  $p as xs:string+)
- as cts:query
+declare function sem:pq(
+  $p as xs:string*)
+ as cts:query?
 {
   sem:rq($sem:QN-P, $p)
 };
 
 (: ObjectQuery - returns a cts:query that matches objects in $o :)
-declare private function sem:oq(
-  $o as xs:string+)
- as cts:query
+declare function sem:oq(
+  $o as xs:string*)
+ as cts:query?
 {
   sem:rq($sem:QN-O, $o)
 };
 
 (: SubjectQuery - returns a cts:query that matches subjects in $s :)
-declare private function sem:sq(
-  $s as xs:string+)
- as cts:query
+declare function sem:sq(
+  $s as xs:string*)
+ as cts:query?
 {
   sem:rq($sem:QN-S, $s)
 };
@@ -140,7 +141,7 @@ declare private function sem:opq(
   $o as xs:string+, $p as xs:string+)
  as cts:query
 {
-  cts:and-query((sem:rq($sem:QN-O, $o), sem:pq($p)))
+  cts:and-query((sem:oq($o), sem:pq($p)))
 };
 
 (: SubjectPredicateQuery - returns a cts:query that matches subjects in $s and predicates in $p:)
@@ -148,7 +149,15 @@ declare private function sem:spq(
   $s as xs:string+, $p as xs:string+)
  as cts:query
 {
-  cts:and-query((sem:rq($sem:QN-S, $s), sem:pq($p)))
+  cts:and-query((sem:sq($s), sem:pq($p)))
+};
+
+(: SubjectObjectQuery - returns a cts:query that matches subjects in $s and objects in $o :)
+declare private function sem:soq(
+  $s as xs:string+, $o as xs:string+)
+ as cts:query
+{
+  cts:and-query((sem:sq($s), sem:oq($o)))
 };
 
 (: SubjectObjectPredicateQuery - returns a cts:query that matches subjects in $s, objects in $o, and predicates in $p:)
@@ -156,31 +165,31 @@ declare private function sem:sopq(
   $s as xs:string+, $o as xs:string+, $p as xs:string+)
  as cts:query
 {
-  cts:and-query((sem:rq($sem:QN-S, $s), sem:rq($sem:QN-O, $o), sem:pq($p)))
+  cts:and-query((sem:sq($s), sem:oq($o), sem:pq($p)))
 };
 
-(: returns objects that matches predicates in $p :) 
+(: returns objects that matches predicates in $p :)
 declare function sem:object-for-predicate(
   $p as xs:string+)
-as xs:string*
+as map:map?
 {
   if (empty($p)) then ()
   else sem:ev($sem:QN-O, sem:pq($p))
 };
 
-(: returns subjects that matches predicates in $p :) 
+(: returns subjects that matches predicates in $p :)
 declare function sem:subject-for-predicate(
   $p as xs:string+)
-as xs:string*
+as map:map?
 {
   if (empty($p)) then ()
   else sem:ev($sem:QN-S, sem:pq($p))
 };
 
-(: returns objects that matches subjects in $s, and predicates in $p :) 
+(: returns objects that matches subjects in $s, and predicates in $p :)
 declare function sem:object-for-object-predicate(
   $s as xs:string*, $p as xs:string+)
-as xs:string*
+as map:map?
 {
   if (empty($s)) then ()
   else sem:ev($sem:QN-O, sem:opq($s, $p))
@@ -189,16 +198,27 @@ as xs:string*
 (: returns objects that matches subjects in $s and predicates in $p :)
 declare function sem:object-for-subject-predicate(
   $s as xs:string*, $p as xs:string+)
-as xs:string*
+as map:map?
 {
   if (empty($s)) then ()
   else sem:ev($sem:QN-O, sem:spq($s, $p))
 };
 
+(: returns predicates that matches subjects in $s and objects in $o :)
+declare function sem:predicate-for-subject-object(
+   $s as xs:string+, $o as xs:string+)
+as map:map?
+{
+  if (not($sem:DEBUG)) then ()
+  else xdmp:log(text { 'sem:predicate-for-subject-object', $s, $o })
+  ,
+  sem:ev($sem:QN-P, sem:soq($s, $o))
+};
+
 (: returns subjects that matches objects in $o and predicates in $p :)
 declare function sem:subject-for-object-predicate(
    $o as xs:string*, $p as xs:string+)
-as xs:string*
+as map:map?
 {
   if (not($sem:DEBUG)) then ()
   else xdmp:log(text { 'sem:subject-for-object-predicate', $o, $p })
@@ -210,7 +230,7 @@ as xs:string*
 (: returns subjects that matches subjects in $s and predicates in $p :)
 declare function sem:subject-for-subject-predicate(
    $s as xs:string*, $p as xs:string+)
-as xs:string*
+as map:map?
 {
   if (empty($s)) then ()
   else sem:ev($sem:QN-S, sem:spq($s, $p))
@@ -221,7 +241,7 @@ declare function sem:object-by-subject-object-predicate(
   $s as xs:string+,
   $o as xs:string+,
   $p as xs:string+)
-as xs:string*
+as map:map?
 {
   sem:ev($sem:QN-O, sem:sopq($s, $o, $p))
 };
@@ -231,7 +251,7 @@ declare function sem:subject-by-subject-object-predicate(
   $s as xs:string+,
   $o as xs:string+,
   $p as xs:string+)
-as xs:string*
+as map:map?
 {
   sem:ev($sem:QN-S, sem:sopq($s, $o, $p))
 };
@@ -279,13 +299,13 @@ declare private function sem:transitive-closure-filter(
 };
 
 (:
- Find the transitive-closure, starting from $seeds, using $relation as the predicate for traversing edges.  
+ Find the transitive-closure, starting from $seeds, using $relation as the predicate for traversing edges.
  $m - This is used to store filtered results, where key = name, value = generation count
  $seeds     - This stores unfiltered results, and it's used recursively for finding the next generation of friends
  $gen       - An integer for counting generations
  $relation  - the predicate used for finding relationships
  $direction - If true, we traverse from subject to object.  If false, we traverse from object to subject
- $filter    - Used to filter out results.  Note that filter only essentially apply to the end result.  
+ $filter    - Used to filter out results.  Note that filter only essentially apply to the end result.
               Friends that match the filter is still used to find the next generation of friends.
 :)
 declare function sem:transitive-closure(
@@ -311,7 +331,7 @@ declare function sem:transitive-closure(
   )
   else (
     (: get the next generation of friends :)
-    let $new-friends := (
+    let $new-friends-map := (
       if ($direction) then sem:object-for-subject-predicate($seeds, $relation)
       else sem:subject-for-object-predicate($seeds, $relation)
     )
@@ -319,12 +339,12 @@ declare function sem:transitive-closure(
       if (not($sem:DEBUG)) then ()
       else xdmp:log(text {
         'transitive-closure gen',
-          $gen, count($seeds), 'new', count($new-friends) })
+          $gen, count($seeds), 'new', map:count($new-friends-map) })
     )
     let $next-gen := $gen - 1
     (: transitive-closure-filter does the map:put, so always call it :)
     let $new-friends := sem:transitive-closure-filter(
-      $m, $new-friends, $filters, $next-gen)
+      $m, map:keys($new-friends-map), $filters, $next-gen)
     let $d := (
       if (not($sem:DEBUG)) then ()
       else xdmp:log(text {
@@ -358,7 +378,7 @@ declare function sem:serialize(
   else xdmp:log(text { 'serialize end', $max-gen })
 };
 
-(: 
+(:
 returns a sem:join element that joins objects in $o and predicates in
 $p, sem:join is used in *-for-join functions
 :)
@@ -373,7 +393,7 @@ declare function sem:object-predicate-join(
     for $i in $o return element sem:o { $i } }
 };
 
-(: 
+(:
 returns a sem:join element that joins predicates in $p, sem:join is
 used in *-for-join functions
 :)
@@ -386,7 +406,7 @@ declare function sem:predicate-join(
     for $i in $p return element sem:p { $i } }
 };
 
-(: 
+(:
 returns a sem:join element that joins subjects in $s and predicates in
 $p, sem:join is used in *-for-join functions
 :)
@@ -401,7 +421,7 @@ declare function sem:subject-predicate-join(
     for $i in $p return element sem:p { $i } }
 };
 
-(: 
+(:
 returns a sem:join element that joins objects in $type and predicates
 in $sem:P-RDF-TYPE
 :)
@@ -462,7 +482,7 @@ declare function sem:object-for-join(
 };
 
 
-(: 
+(:
 returns objects that matches the sem:join conditions in $first, and
 then $joins, search is limited to triples that match elements in
 $seeds
@@ -477,7 +497,7 @@ declare private function sem:object-for-join(
     $seeds, $first/sem:s, $first/sem:o, $first/sem:p, $joins)
 };
 
-(: 
+(:
 returns objects that matches subjects in $s, objects in $o, predicates
 in $p, and then $joins.  Search is limited to triples that match
 element in $seeds.
@@ -852,6 +872,31 @@ declare function sem:tuples-for-object(
 as element(t)*
 {
   sem:tuples-for-query(sem:oq($o))
+};
+
+declare function sem:tuples-map-for-query(
+  $m as map:map,
+  $q as cts:query )
+as map:map
+{
+  let $build := (
+    for $t in cts:search(/t, $q, 'unfiltered')
+    let $tmap := map:map()
+    let $build := (
+      for $i in $t/*
+      return map:put($tmap, local-name($i), $i/string()) )
+    return map:put($m, xdmp:node-uri($t), $tmap)
+  )
+  return $m
+};
+
+declare function sem:tuples-map-for-query(
+  $q as cts:query )
+as map:map
+{
+  sem:tuples-map-for-query(
+    map:map(),
+    $q )
 };
 
 declare function sem:select(
