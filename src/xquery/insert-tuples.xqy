@@ -1,6 +1,6 @@
 xquery version "1.0-ml";
 (:
- : Copyright (c)2009-2010 Mark Logic Corporation
+ : Copyright (c)2009-2011 Mark Logic Corporation
  :)
 
 import module namespace sem="http://marklogic.com/semantic"
