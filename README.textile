@@ -1,1 +1,1 @@
-This branch controls the content visible at "http://marklogic.github.com/semantic/":http://marklogic.github.com/semantic/
+This branch controls the content visible at "http://marklogic.github.io/semantic/":http://marklogic.github.io/semantic/
