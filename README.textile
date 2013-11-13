@@ -1,1 +1,11 @@
-For more information see  "http://marklogic.github.com/semantic/":http://marklogic.github.com/semantic/
+*Note:* MarkLogic 7 introduces support for semantic queries, including support for 
+all of the capabilities in SPARQL 1.0 and many of the capabilities in SPARQL 1.1. 
+MarkLogic includes rich support for triples, and integrates querying triples with MarkLogic search in 
+ways that allow you to not only create interesting semantic applications, but to integrate them with search in 
+a rich way. For details, see the <a href="http://docs.marklogic.com/guide/semantics">Semantics Developer's Guide</a>.
+
+If you are using MarkLogic 6 or earlier, you should stick with this toolkit.
+
+
+
+For more information see  "http://marklogic.github.com/semantic/":http://marklogic.github.io/semantic/
